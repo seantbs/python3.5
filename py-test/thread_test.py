@@ -16,14 +16,11 @@ def y(s,e):
 def pq_put():
 	global pq,a,b
 	for i in range(a,b):
-		if a == i and a < b:
-			g=y(i,i+1)
-			try:
-				 pq.put(next(g))
-			except:
-				break
-		elif a != i:
-			continue
+		g=y(i,i+1)
+		try:
+			 pq.put(next(g))
+		except:
+			break
 		#print("pq func a =",a)
 
 def pq_get():
@@ -36,7 +33,7 @@ def pq_get():
 
 if __name__=='__main__':
 	a=1
-	b=10001
+	b=1001
 	ths=100
 	pq=queue.Queue(ths)
 	
