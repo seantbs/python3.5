@@ -4,6 +4,10 @@ from multiprocessing import Process,Pool,Queue,Value,Array
 import os,threading,queue,time,random
 print("start running:",time.ctime())
 
+def pa_y():
+  for i in range(pa.value,pb):
+    yield i
+
 def pw_y(a):
   while not pw.full():
     for i in range(a):
@@ -11,27 +15,31 @@ def pw_y(a):
       pw.put(i)
   return
 
-def y(a,b):
+def tq_y(a,b):
   for i in range(a,b):
     yield i
 
 def check(w):
+  #print("put proc id=",os.getpid(),"pa value:",pa.value)
+  #print(os.getpid(),"pq empty:",pq.empty())
   if pa.value >= pb:
     return 0
+  elif pq.empty():
+    pq.put(w)
+    #print("put proc id=",os.getpid(),"weight code:",w)
+    return 1
   else:
-    while pq.empty():
-      pq.put(w)
-      #print("put proc id=",os.getpid(),"weight code:",w)
-      return 1
     tfunc(w)
 
 def tq_put(w):
+  print(threading.current_thread().name,"pa value:",pa.value)
   if check(w) and pa.value < pb:
-    pg=y(pa.value,pb)
+    pc=pa_y()
+    pg=tq_y(next(pc),pb)
     while not tq.full():
       try:
         tq.put(next(pg))
-        pa.value+=1
+        pa.value=next(pc)
       except:
         return
     pq.get()
@@ -55,25 +63,22 @@ def pfunc(pv,ths):
 def tfunc(w):
   #print(threading.current_thread().name,"tq empty is",tq.empty())
   while not tq.empty():
-    try:
-      print("tfunc that",threading.current_thread().name,"is running code=\t",tq.get_nowait())
-      time.sleep(random.randint(1,2))
-    except:
-      return
+    print("tfunc that",threading.current_thread().name,"is running code=\t",tq.get())
+    time.sleep(random.randint(1,2))
   tq_put(w)
 
 if __name__=='__main__':
   tstart=time.time()
   pv=123456
   procs=os.cpu_count()
-  ths=300
+  ths=10
   tq=queue.Queue(ths)
 
   pa=Value('i',1)
-  pb=100001
+  pb=101
   pw=Queue(procs)
   pw_y(procs)
-  pq=Queue(1)
+  pq=Queue(2)
 
   p=Pool(procs)
   for i in range(procs):
