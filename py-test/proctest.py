@@ -28,22 +28,24 @@ def tq_y(a,b):
 
 def check():
 	global pb,w
-	print("put proc id=",os.getpid(),"weight code:",w)
+	#print("put proc id=",os.getpid(),"weight code:",w)
 	if pa.value >= pb:
-		return 0
-	elif pq.empty():
+		return
+	elif not pq.full():
 		g=pq_y()
-		pq.put(next(g))
-		print("put proc id=",os.getpid(),"pa value:",pa.value)
+		pq.put_nowait(next(g))
 		return 1
+		#print("put proc id=",os.getpid(),"pa value:",pa.value)
+	else:
+		efunc()
 
 def tq_put():
 	global ths
 	a,b=0,0
-	print(threading.current_thread().name,"is prepare pa value:",pa.value)
+	#print(threading.current_thread().name,"is prepare pa value:",pa.value)
 	try:
 		b=pq.get_nowait()
-		tevent.clear()
+		pevent.set()
 		a=b-ths
 		print("get proc id=",os.getpid(),"pq get:",a)
 	except:
@@ -74,9 +76,10 @@ def tfunc():
 
 def efunc():
 	print(threading.current_thread().name,"is running.")
-	while tevent.is_set() == False:
-		check()
+	if check():
 		tevent.set()
+	else:
+		
 
 def c_proc(procs):
 	p=Pool(procs)
@@ -84,7 +87,7 @@ def c_proc(procs):
 		p.apply_async(pfunc,args=())
 	p.close()
 	p.join()
-	
+
 def c_work_th():
 	global ths
 	thpool=[]
@@ -98,7 +101,7 @@ def c_work_th():
 
 def c_event_th():
 	print('event thread is starting...')
-	te=threading.Thread(target=efunc,args=(),name="event_tid-"+str(os.getpid()))
+	te=threading.Thread(target=efunc,args=(),name="event_tid"+str(os.getpid()))
 	te.start()
 	te.join()
 
@@ -117,7 +120,7 @@ if __name__=='__main__':
 	pw_y(procs)
 	pq=Queue(procs)
 	
-	pevent=Event()
+	pevent=threading.Event()
 	tevent=threading.Event()
 	c_proc(procs)
 
