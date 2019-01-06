@@ -41,7 +41,7 @@ def wq_put():
 		ee.set()
 		#print('[wq_put]ee is_set :',ee.is_set())
 	if i > 0:
-		g=wq_y(i-10,i)
+		g=wq_y(i-ths,i)
 		while not wq.full():
 			try:
 				wq.put(next(g))
@@ -49,8 +49,9 @@ def wq_put():
 				break
 		tfunc()
 	elif i == 0:
-		#print('[wq_put]',threading.current_thread().name,'wq_put is done...')
+		print('[wq_put]',threading.current_thread().name,'wq_put is done...')
 		return
+
 def pefunc():
 	print(os.getpid(),'pefunc is running...')
 	c_e_th()
