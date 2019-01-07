@@ -32,22 +32,26 @@ def eq_put():
 				break
 		return 1
 
+def eq_get():
+	global i
+	if not eq.empty():
+		i=eq.get()
+		print('[eq_get]',os.getpid(),'eq get value :',i)
+		ee.set()
+		#print('[eq_get]ee is_set :',ee.is_set())
+		wq_put()
+
 def wq_put():
 	global i
-	if not eq.empty() and eq_get == 0:
-		i=eq.get()
-		eq_get=1
-		print('[wq_put]',os.getpid(),'eq get value :',i)
-		ee.set()
-		#print('[wq_put]ee is_set :',ee.is_set())
 	if i > 0:
 		g=wq_y(i-ths,i)
 		while not wq.full():
 			try:
 				wq.put(next(g))
 			except:
+				m.get()
 				break
-		tfunc()
+		wfunc()
 	elif i == 0:
 		print('[wq_put]',threading.current_thread().name,'wq_put is done...')
 		return
@@ -58,23 +62,29 @@ def pefunc():
 
 def pwfunc():
 	print(os.getpid(),'pwfunc is running...')
+	mark=None
 	c_w_th(ths)
 
-def tfunc():
+def wfunc():
 	while not wq.empty():
-		print('[tfunc]',threading.current_thread().name,'is running code =',wq.get())
+		print('[wfunc]',threading.current_thread().name,'is running code =',wq.get())
 		r=random.randint(1,2)
+		c_r+=r
 		time.sleep(r)
 	print('[tfunc]now wq is empty,wait wq put...')
 	we.wait()
-	wq_put()
+	if m.empty():
+		m.put(False)
+		eq_get()
+	elif m.full():
+		wq_put()
 
 def efunc():
 	print('[efunc]event tid',os.getpid(),'is running...')
 	while True:
 		if eq_put():
 			we.set()
-			#print('[efunc]ee flag is',ee.is_set())
+			print('[efunc]ee flag is',ee.is_set())
 			ee.wait()
 			eq_put()
 		elif not eq_put():
@@ -91,7 +101,7 @@ def c_e_th():
 def c_w_th(ths):
 	thp=[]
 	for i in range(ths):
-		t=threading.Thread(target=tfunc,name='tid'+str(os.getpid())+r'/'+str(i))
+		t=threading.Thread(target=wfunc,name='tid'+str(os.getpid())+r'/'+str(i))
 		thp.append(t)
 	for a in thp:
 		a.start()
@@ -100,24 +110,22 @@ def c_w_th(ths):
 
 if __name__=='__main__':
 	st=time.time()
-	procs=2
-	#procs=os.cpu_count()
-	ths=4
-	wqs=4
-	wq=queue.Queue(wqs)
+#main var
+	procs=2        
+	#procs=os.cpu_count() 
 	eq=Queue(procs)
-	i=0
 	c=Value('i',20)
-
 #set event
 	ee=Event()
-	ee.set()
 	we=Event()
-
 #start procs
 	pe=Process(target=pefunc)
 	pe.start()
-	eq_get=0
+	ths=4
+	wqs=4
+	wq=queue.Queue(wqs)
+	m=queue.Queue(1)
+	i=0
 	pw=Pool(procs)
 	for i in range(procs):
 		pw.apply_async(pwfunc)
