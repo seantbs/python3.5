@@ -3,56 +3,64 @@
 from multiprocessing import Event,Queue,Pool,Process,Value
 import os,time,random,threading,queue
 
-def eq_y():
-	for i in range(procs):
-		if c.value > wqs:
-			c.value-=wqs
-			i=c.value
-			yield i
-		elif c.value <= wqs and c.value > int(wqs/2):
-			c.value=int(c.value/2)+c.value%2
-			i=c.value
-			yield i
+def eq_y(a,b,c):
+	for i in range(c):
+		if a > b:
+			a-=b
+			yield a
+		elif a <= b:
+			a=int(a/2)+a%2
+			yield a
+		elif a ==1:
+			yield a
 
 def wq_y(a,b):
 	for i in range(a,b):
 		i+=1
 		yield i
-		
 
 def eq_put():
+	global task,wqs,procs
 	print('[eq_put]',threading.current_thread().name,'prepare value...')
-	g=eq_y()
 	while not eq.full():
-		if c.value > int(wqs/2):
-			print('[eq_put]c value =',c.value)
+		if task > 1:
+			g=eq_y(task,wqs,procs)
+			print('[eq_put]task =',task)
 			try:
 				print('[eq_put]eq put value...')
-				eq.put(next(g))
+				task=next(g)
+				print('[eq_put]eq put value =',task)
+				eq.put(task)
 			except:
 				break
-		elif c.value <= int(wqs/2):
-			eq.put(c.value)
+		elif task == 1:
+			print('[eq_put]if task is 1 =',task)
+			eq.put(task)
 			return 0
 	return 1
 
 def eq_get():
 	global i
+	we.clear()
 	print('[eq_get]',os.getpid(),'eq qsize:',eq.qsize())
 	if not eq.empty():
 		i=eq.get()
 		print('[eq_get]',os.getpid(),'eq get value :',i)
 		ee.set()
+		we.set()
 		wq_put()
 	else:
-		ee.set()
+		i=None
+		we.set()
 		wq_put()
 
 def wq_put():
+	we.wait()
 	global i,b
-	if i >= ths:
-		g=wq_y(i,b)
+	print('[wq_put]',threading.current_thread().name,'i =',i)
+	if i:
 		while not wq.full():
+			g=wq_y(i,b)
 			try:
 				wq.put(next(g))
 				i+=1
@@ -60,7 +68,7 @@ def wq_put():
 				m.get()
 				break
 		wfunc()
-	elif i == 0:
+	else:
 		print('[wq_put]',threading.current_thread().name,'wq_put is done...')
 		return
 
@@ -73,32 +81,37 @@ def pwfunc():
 	c_w_th(ths)
 
 def wfunc():
-	global c_r
 	while not wq.empty():
 		print('[wfunc]',threading.current_thread().name,'is running code =',wq.get())
 		r=random.randint(1,2)
-		c_r+=r
+		cr.value+=r
+		count.value+=1
 		time.sleep(r)
-	print('[wfunc]now wq is empty,wait wq put...')
-	print('[wfunc]we is_set:',we.is_set())
+	print('[wfunc]',threading.current_thread().name,'now wq is empty,wait wq put...')
+	print('[wfunc]',threading.current_thread().name,'we is_set:',we.is_set())
 	we.wait()
-	if m.empty():
-		m.put(1)
-		eq_get()
-	elif m.full():
-		wq_put()
+	if not m.full():
+		we.clear()
+		try:
+			m.put_nowait(threading.current_thread().name)
+			eq_get()
+		except:
+			wq_put()
+	wq_put()
 
 def efunc():
+	x=None
 	print('[efunc]event tid',os.getpid(),'is running...')
 	while True:
-		if eq_put():
+		x=eq_put()
+		print('[efunc]eq_put is',x)
+		if x:
 			we.set()
-			print('[efunc]ee flag is',ee.is_set())
 			ee.clear()
 			ee.wait()
-		elif not eq_put():
+		elif not x:
 			ee.clear()
-			print("[efunc]there is no c value to put eq,so pefunc done.")
+			print("[efunc]there is no more task put to eq,so pefunc done.")
 			break
 
 def c_e_th():
@@ -123,10 +136,11 @@ if __name__=='__main__':
 	procs=2        
 	#procs=os.cpu_count() 
 	eq=Queue(procs)
-	c=Value('i',10)
+	task=10
 	wqs=2
 #set event
 	ee=Event()
+	ee.set()
 	we=Event()
 #start procs
 	pe=Process(target=pefunc)
@@ -135,7 +149,8 @@ if __name__=='__main__':
 	wq=queue.Queue(wqs)
 	m=queue.Queue(1)
 	i=0
-	c_r=0
+	cr=Value('i',0)
+	count=Value('i',0)
 	b=10
 	pw=Pool(procs)
 	for i in range(procs):
@@ -144,5 +159,5 @@ if __name__=='__main__':
 	pe.join()
 	pw.join()
 
-	print('real time:',c_r,'s')
-	print('use time :',time.time()-st)
+	print('real time:',cr.value,'s\tcounts:',count.value)
+	print('use time :',time.time()-st,'s')
