@@ -4,8 +4,8 @@ from multiprocessing import Event,Queue,Pool,Process,Value
 import os,time,random,threading,queue
 
 def eq_put_y(a,b,c):
-	if a == 0:
-		return 0
+	if a == 1:
+		return
 	for i in range(c):
 		if a >= b:
 			a-=b
@@ -39,7 +39,7 @@ def eq_get():
 			wq_put()
 		elif wqcount*2 <= wqs:
 			wg=wq_put_y(wqcount,int(wqs/2))
-			print('[eq_get]wqcount is 0,so eq_get done.')
+			print('[eq_get]',threading.current_thread().name,'wqcount is 1,so eq_get done.')
 			we.set()
 			wq_put()
 	else:
@@ -56,9 +56,9 @@ def eq_put():
 		try:
 			task=next(g)
 			print('[eq_put]eq put value =',task)
-		except:
-			print('[eq_put]eq put value = 0,so eq_put done.')
 			eq.put(task)
+		except:
+			print('[eq_put]eq put value = 1,so eq_put done.')
 			return 0
 	return 1
 
@@ -73,7 +73,7 @@ def wq_put():
 			wq.put_nowait(x)
 		except:
 			print('[wq_put]m is getting...')
-			m.get_nowait()		
+			m.get_nowait()
 		wfunc()
 	else:
 		wfunc()
@@ -88,7 +88,7 @@ def wfunc():
 		time.sleep(r)
 	#print('[wfunc]',threading.current_thread().name,'now wq is empty,wait wq put...')
 	we.wait()
-	if not m.full():
+	if not m.full() and not eq.empty():
 		try:
 			m.put_nowait(threading.current_thread().name)
 			eq_get()
@@ -97,19 +97,22 @@ def wfunc():
 			we.wait()
 			wq_put()
 	else:
+		we.clear()
+		we.wait()
 		wq_put()
 
 def efunc():
-	x=None
 	print('[efunc]event tid',os.getpid(),'is running...')
 	while True:
+		x=None
 		x=eq_put()
-		#print('[efunc]eq_put is',x)
 		if x:
+			print('[efunc]eq_put is',x)
 			we.set()
 			ee.clear()
 			ee.wait()
 		else:
+			print('[efunc]eq_put is',x)
 			print("[efunc]there is no more task put to eq,so pefunc done.")
 			print('*'*60)
 			break
@@ -167,5 +170,5 @@ if __name__=='__main__':
 	pe.join()
 	pw.join()
 
-	print('real time:',cr.value,'s\tcounts:',count.value)
+	print('real time:',cr,'s\tcounts:',count)
 	print('use time :',time.time()-st,'s')
