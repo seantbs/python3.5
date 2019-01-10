@@ -4,48 +4,21 @@ from multiprocessing import Event,Queue,Pool,Process,Value
 import os,time,random,threading,queue
 
 def eq_put_y(a,b,c):
-	if a == 1:
+	if a == 0:
 		return
 	for i in range(c):
-		if a >= b:
+		if a >= b*c:
 			a-=b
 			yield a
-		elif a < b and a*2 > b:
-			a=int(a/2)+a%2
+		elif a >= b and a < b*c:
+			a=a-(int(a/c)+a%c)
 			yield a
-		elif a*2 <= b:
-				yield 1
-
+		elif a < b:
+			yield 0
 
 def wq_put_y(a,b):
 	for i in range(a,b):
 		yield i
-
-def eq_get():
-	global wqs,wqcount,wg
-	#print('[eq_get]',threading.current_thread().name,'eq qsize:',eq.qsize())
-	if not eq.empty():
-		wqcount=eq.get()
-		#print('[eq_get]',threading.current_thread().name,'ee set:',ee.is_set(),threading.current_thread().name,'we set:',we.is_set())
-		ee.set()
-		if wqcount > wqs:
-			wg=wq_put_y(wqcount,wqcount+wqs)
-			print('[eq_get]',threading.current_thread().name,'wqcount =',wqcount)
-			we.set()
-			wq_put()
-		elif wqcount < wqs and wqcount*2 >wqs:
-			wg=wq_put_y(wqcount,wqs)
-			we.set()
-			wq_put()
-		elif wqcount*2 <= wqs:
-			wg=wq_put_y(wqcount,int(wqs/2))
-			print('[eq_get]',threading.current_thread().name,'wqcount is 1,so eq_get done.')
-			we.set()
-			wq_put()
-	else:
-		print('[eq_get]eq is empty',threading.current_thread().name,'wqcount =',wqcount)
-		we.set()
-		wq_put()
 
 def eq_put():
 	global task,wqs,procs
@@ -60,12 +33,39 @@ def eq_put():
 		except:
 			print('[eq_put]eq put value = 1,so eq_put done.')
 			return 0
-	return 1
+	return 1		
+		
+def eq_get():
+	global wqs,wql,wqn,wg,procs
+	if not eq.empty():
+		wqn=eq.get()
+		ee.set()
+		if wqn+wqs >= wqs*procs:
+			wg=wq_put_y(wqn,wqn+wqs)
+			print('[eq_get]',threading.current_thread().name,'wqn >= wqs*procs wqn =',wqn)
+			wql=wqn
+			we.set()
+			wq_put()
+		elif wqn > wqs and wqn < wqs*procs:
+			wg=wq_put_y(wqn,wql)
+			wql=wqn
+			print('[eq_get]',threading.current_thread().name,'wqn > wqs and wqn < wqs*procs wqn =',wqn)
+			we.set()
+			wq_put()
+		elif wqn < wqs:
+			wg=wq_put_y(0,wqn)
+			print('[eq_get]',threading.current_thread().name,'wqn is 0,so eq_get done.')
+			we.set()
+			wq_put()
+	else:
+		print('[eq_get]eq is empty',threading.current_thread().name,'wqn =',wqn)
+		we.set()
+		wq_put()
 
 def wq_put():
 	global wg
 	x=None
-	print('[wq_put]',threading.current_thread().name,'wqcount =',wqcount)
+	print('[wq_put]',threading.current_thread().name,'wqn =',wqn)
 	if not wq.full():
 		try:
 			x=next(wg)
@@ -89,18 +89,18 @@ def wfunc():
 	#print('[wfunc]',threading.current_thread().name,'now wq is empty,wait wq put...')
 	we.wait()
 	if not m.full() and not eq.empty():
-		try:
-			m.put_nowait(threading.current_thread().name)
+		if not m.full():
+			m.put(threading.current_thread().name)
+			print('[wfunc]',threading.current_thread().name,'m put...')
 			eq_get()
-		except:
+		else:
 			we.clear()
 			we.wait()
 			wq_put()
-	else:
-		we.clear()
-		we.wait()
+	elif wqn != 0 :
 		wq_put()
-
+	#print('pid =',os.getpid(),'real time:',cr,'s\tcounts:',count)
+			
 def efunc():
 	print('[efunc]event tid',os.getpid(),'is running...')
 	while True:
@@ -159,7 +159,8 @@ if __name__=='__main__':
 	ths=8
 	wq=queue.Queue(wqs)
 	m=queue.Queue(1)
-	wqcount=0
+	wql=0
+	wqn=0
 	wg=None
 	cr=0
 	count=0
@@ -169,6 +170,6 @@ if __name__=='__main__':
 	pw.close()
 	pe.join()
 	pw.join()
-
-	print('real time:',cr,'s\tcounts:',count)
+	print('wqn =',wqn)
+	#print('pid =',os.getpid(),'real time:',cr,'s\tcounts:',count)
 	print('use time :',time.time()-st,'s')
