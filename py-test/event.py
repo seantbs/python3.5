@@ -42,18 +42,20 @@ def eq_get():
 		ee.set()
 		if wqn+wqs >= wqs*procs:
 			wg=wq_put_y(wqn,wqn+wqs)
-			print('[eq_get]',threading.current_thread().name,'wqn >= wqs*procs wqn =',wqn)
+			print('[eq_get]',threading.current_thread().name,'wqn >= wqs*procs wql =',wql)
 			wql=wqn
+			print('[eq_get]',threading.current_thread().name,'wqn >= wqs*procs wqn =',wqn)
 			we.set()
 			wq_put()
-		elif wqn > wqs and wqn < wqs*procs:
-			wg=wq_put_y(wqn,wql)
+		elif wqn*2 >= wqs and wqn < wqs*procs:
+			wg=wq_put_y(5,10)
+			print('[eq_get]',threading.current_thread().name,'wqn > wqs and wqn < wqs*procs wql =',wql)
 			wql=wqn
 			print('[eq_get]',threading.current_thread().name,'wqn > wqs and wqn < wqs*procs wqn =',wqn)
 			we.set()
 			wq_put()
-		elif wqn < wqs:
-			wg=wq_put_y(0,wqn)
+		elif wqn*2 < wqs:
+			wg=wq_put_y(0,5)
 			print('[eq_get]',threading.current_thread().name,'wqn is 0,so eq_get done.')
 			we.set()
 			wq_put()
@@ -65,15 +67,16 @@ def eq_get():
 def wq_put():
 	global wg
 	x=None
-	print('[wq_put]',threading.current_thread().name,'wqn =',wqn)
+	print('[wq_put]',threading.current_thread().name,'wqn =',wqn,'wql =',wql)
 	if not wq.full():
 		try:
 			x=next(wg)
-			#print('[wq_put]',threading.current_thread().name,'next g =',x)
-			wq.put_nowait(x)
+			print('[wq_put]',threading.current_thread().name,'next g =',x)
+			wq.put(x)
 		except:
 			print('[wq_put]m is getting...')
-			m.get_nowait()
+			if not m.empty():
+				m.get()
 		wfunc()
 	else:
 		wfunc()
@@ -97,9 +100,10 @@ def wfunc():
 			we.clear()
 			we.wait()
 			wq_put()
-	elif wqn != 0 :
+	elif m.empty() and eq.empty():
+		return
+	else:
 		wq_put()
-	#print('pid =',os.getpid(),'real time:',cr,'s\tcounts:',count)
 			
 def efunc():
 	print('[efunc]event tid',os.getpid(),'is running...')
@@ -136,10 +140,11 @@ def c_w_th(ths):
 def pefunc():
 	print(os.getpid(),'pefunc is running...')
 	c_e_th()
-
+	
 def pwfunc():
 	print(os.getpid(),'pwfunc is running...')
 	c_w_th(ths)		
+	print('pid =',os.getpid(),'real time:',cr,'s\tcounts:',count)
 
 if __name__=='__main__':
 	st=time.time()
@@ -147,7 +152,7 @@ if __name__=='__main__':
 	procs=2        
 	#procs=os.cpu_count() 
 	eq=Queue(procs)
-	task=20
+	task=10
 	wqs=8
 #set event
 	ee=Event()
