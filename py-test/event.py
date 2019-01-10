@@ -31,7 +31,7 @@ def eq_put():
 			print('[eq_put]eq put value =',task)
 			eq.put(task)
 		except:
-			print('[eq_put]eq put value = 1,so eq_put done.')
+			print('[eq_put]eq put value = 0,so eq_put done.')
 			return 0
 	return 1		
 		
@@ -71,7 +71,7 @@ def wq_put():
 	if not wq.full():
 		try:
 			x=next(wg)
-			print('[wq_put]',threading.current_thread().name,'next g =',x)
+			#print('[wq_put]',threading.current_thread().name,'next g =',x)
 			wq.put(x)
 		except:
 			print('[wq_put]m is getting...')
@@ -97,12 +97,17 @@ def wfunc():
 			print('[wfunc]',threading.current_thread().name,'m put...')
 			eq_get()
 		else:
+			print('[wfunc]',threading.current_thread().name,'wfunc elifis wait...')
 			we.clear()
 			we.wait()
 			wq_put()
 	elif m.empty() and eq.empty():
+		print('[wfunc]',threading.current_thread().name,'wfunc is done...')
 		return
 	else:
+		print('[wfunc]',threading.current_thread().name,'wfunc else is wait...')
+		we.clear()
+		we.wait()
 		wq_put()
 			
 def efunc():
