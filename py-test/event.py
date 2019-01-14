@@ -1,7 +1,7 @@
 #!/usr/bin/python3
 
 from multiprocessing import Event,Queue,Pool,Process,Value
-import os,time,random,threading,queue
+import io,os,sys,time,random,threading,queue
 
 def eq_put_y(a,b,c):
 	if a == 0:
@@ -29,6 +29,7 @@ def eq_put_y(a,b,c):
 
 def wq_put_y(a,b):
 	for i in range(a,b):
+		i+=1
 		yield i
 
 def eq_put():
@@ -77,16 +78,13 @@ def eq_get():
 
 def wq_put():
 	global wg
-	#print('[wq_put]',threading.current_thread().name,'we is set =',we.is_set())
 	x=None
 	#print('[wq_put]',threading.current_thread().name,'wqn =',wqn,'wql =',wql)
 	if not wq.full():
 		try:
 			x=next(wg)
-			#print('[wq_put]',threading.current_thread().name,'next g =',x)
 			wq.put(x)
 		except:
-			#print('[wq_put]m is getting...')
 			if not m.empty():
 				m.get()
 		wfunc()
@@ -94,11 +92,12 @@ def wq_put():
 		wfunc()
 
 def wfunc():
-	global ptime,pcount
+	global ptime,pcount,ramf
 	while not wq.empty():
-		wq.get()
+		#ramf.write(threading.current_thread().name+' is running code =\t'+str(wq.get())+'\n')
+		ramf.write(str(wq.get())+'\n')
 		#print('[wfunc]',threading.current_thread().name,'is running code =\t',wq.get())
-		r=random.randint(3,5)
+		r=random.randint(1,2)
 		ptime+=r
 		pcount+=1
 		time.sleep(r)
@@ -106,18 +105,13 @@ def wfunc():
 	if not m.full() and not eq.empty():
 		if not m.full():
 			m.put(threading.current_thread().name)
-			#print('[wfunc]',threading.current_thread().name,'m put...')
 			eq_get()
 		else:
-			#print('[wfunc]',threading.current_thread().name,'wfunc elifis wait...')
-			#print('[wfunc]elifis',threading.current_thread().name,'we is set =',we.is_set())
 			we.wait()
 			wq_put()
 	elif m.empty() and eq.empty():
 		return
 	else:
-		#print('[wfunc]',threading.current_thread().name,'wfunc else is wait...')
-		#print('[wfunc]else',threading.current_thread().name,'we is set =',we.is_set())
 		we.wait()
 		wq_put()
 
@@ -127,11 +121,9 @@ def efunc():
 		x=None
 		x=eq_put()
 		if x:
-			#print('[efunc]eq_put is',x)
 			ee.clear()
 			ee.wait()
 		else:
-			#print('[efunc]eq_put is',x)
 			print("[efunc]there is no more task put to eq,so efunc done.")
 			print('*'*60)
 			break
@@ -150,26 +142,44 @@ def c_w_th(ths):
 	for a in thp:
 		a.start()
 	for b in thp:
-		b.join(5)
-	print('[wfunc]',os.getpid(),'wfunc is done...')
+		b.join(4)
+	#print('[wfunc]',os.getpid(),'wfunc is done...')
 
 def pefunc():
 	print(os.getpid(),'pefunc is running...')
 	c_e_th()
 
 def pwfunc():
-	global allcount,alltime
+	global allcount,alltime,reslog,ramf
 	print(os.getpid(),'pwfunc is running...')
-	c_w_th(ths)	
+	c_w_th(ths)
+	ramf2=io.StringIO(ramf.getvalue())
 	allcount.value+=pcount
 	alltime.value+=ptime
 	print('pid =',os.getpid(),'real time:',ptime,'s\tcounts:',pcount)
+	while True:
+		ram2res=ramf2.readline()
+		if ram2res == '':
+			break
+		try:
+			reslog.write(ram2res)
+			reslog.flush()
+		except:
+			print('result.log write erroe at line:',ram2res)
+			continue
 
 if __name__=='__main__':
 	st=time.time()
 #main public var
-	procs=2
-	ths=2048
+	try:
+		os.remove('./result.log')
+	except:
+		pass
+	os.path.exists("./result.log")
+	reslog=open('./result.log','a+')
+	ramf=io.StringIO()
+	procs=4
+	ths=1024
 	#procs=os.cpu_count()
 	eq=Queue(procs)
 	task=50000
@@ -194,5 +204,6 @@ if __name__=='__main__':
 	pw.close()
 	pe.join()
 	pw.join()
+	reslog.close()
 	print('real time:',alltime.value,'s\tcounts:',allcount.value)
 	print('use time :',time.time()-st,'s')
