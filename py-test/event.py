@@ -66,8 +66,8 @@ def eq_get():
 		wqn=wq.pop(0)
 		ee.set()
 		wg=wq_put_y(wqn,wql)
-		print('[eq_get]',threading.current_thread().name,'wqn >= wqs*procs wql =',wql)
-		print('[eq_get]',threading.current_thread().name,'wqn >= wqs*procs wqn =',wqn)
+		#print('[eq_get]',threading.current_thread().name,'wqn >= wqs*procs wql =',wql)
+		#print('[eq_get]',threading.current_thread().name,'wqn >= wqs*procs wqn =',wqn)
 		we.set()
 		wq_put()
 	else:
@@ -94,12 +94,13 @@ def wq_put():
 		wfunc()
 
 def wfunc():
-	global cr,count
+	global ptime,pcount
 	while not wq.empty():
-		print('[wfunc]',threading.current_thread().name,'is running code =\t',wq.get())
-		r=random.randint(1,2)
-		cr+=r
-		count+=1
+		wq.get()
+		#print('[wfunc]',threading.current_thread().name,'is running code =\t',wq.get())
+		r=random.randint(3,5)
+		ptime+=r
+		pcount+=1
 		time.sleep(r)
 	#print('[wfunc]',threading.current_thread().name,'now wq is empty,wait wq put...')
 	if not m.full() and not eq.empty():
@@ -149,7 +150,7 @@ def c_w_th(ths):
 	for a in thp:
 		a.start()
 	for b in thp:
-		b.join(2)
+		b.join(5)
 	print('[wfunc]',os.getpid(),'wfunc is done...')
 
 def pefunc():
@@ -157,36 +158,41 @@ def pefunc():
 	c_e_th()
 
 def pwfunc():
+	global allcount,alltime
 	print(os.getpid(),'pwfunc is running...')
-	c_w_th(ths)		
-	print('pid =',os.getpid(),'real time:',cr,'s\tcounts:',count)
+	c_w_th(ths)	
+	allcount.value+=pcount
+	alltime.value+=ptime
+	print('pid =',os.getpid(),'real time:',ptime,'s\tcounts:',pcount)
 
 if __name__=='__main__':
 	st=time.time()
 #main public var
 	procs=2
+	ths=2048
 	#procs=os.cpu_count()
 	eq=Queue(procs)
-	task=1000
-	wqs=16
+	task=50000
+	wqs=ths*4
 #set event of procs
 	ee=Event()
 	ee.set()
 #set var in procs
 	pe=Process(target=pefunc)
 	pe.start()
-	ths=32
 	wq=queue.Queue(wqs)
 	m=queue.Queue(1)
 	we=threading.Event()
 	wg=None
-	cr=0
-	count=0
+	ptime=0
+	pcount=0
+	alltime=Value('i',0)
+	allcount=Value('i',0)
 	pw=Pool(procs)
 	for i in range(procs):
 		pw.apply_async(pwfunc)
 	pw.close()
 	pe.join()
 	pw.join()
-	#print('pid =',os.getpid(),'real time:',cr,'s\tcounts:',count)
+	print('real time:',alltime.value,'s\tcounts:',allcount.value)
 	print('use time :',time.time()-st,'s')
