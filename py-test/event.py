@@ -1,7 +1,7 @@
 #!/usr/bin/python3
 
 from multiprocessing import Event,Queue,Pool,Process,Value
-import io,os,sys,time,random,threading,queue
+import io,os,sys,time,random,threading,queue,pgbar
 
 def eq_put_y(a,b,c):
 	if a == 0:
@@ -95,9 +95,11 @@ def wfunc():
 	global ptime,pcount,ramf
 	while not wq.empty():
 		#ramf.write(threading.current_thread().name+' is running code =\t'+str(wq.get())+'\n')
-		ramf.write(str(wq.get())+'\n')
+		std=str(wq.get())+'\n'
+		ramf.write(std)
+		bar.value+=1
 		#print('[wfunc]',threading.current_thread().name,'is running code =\t',wq.get())
-		r=random.randint(1,2)
+		r=random.randint(3,5)
 		ptime+=r
 		pcount+=1
 		time.sleep(r)
@@ -124,15 +126,51 @@ def efunc():
 			ee.clear()
 			ee.wait()
 		else:
-			print("[efunc]there is no more task put to eq,so efunc done.")
-			print('*'*60)
+			ee.clear()
+			print('\n[efunc]there is no more task put to eq,so efunc done.')
+			print('\n'+'*'*60+'\n')
+			break
+
+def wfunc_bar():
+	global task
+	print('\n[wfunc_bar]wfunc_bar tid',os.getpid(),'is running...')
+	print('\nwfunc is running:')
+	while True:
+		if bar.value < task:
+			pgbar.bar(task,bar.value,50)
+			time.sleep(0.1)
+		else:
+			ee.wait()
+			sys.stdout.write('\r'+'>'*50+'100.00%')
+			break
+	print('\nwaiting for wfunc thread over...')
+	
+def pwfunc_bar():
+	global task
+	ee.clear()
+	ee.wait()
+	print('\n[pwfunc_bar]wfunc_bar tid',os.getpid(),'is running...')
+	print('\nwriting to result.log file...:')
+	print('bar',bar.value)
+	while True:
+		if bar.value <= task:
+			pgbar.bar(task,bar.value,50)
+			time.sleep(0.01)
+		else:
+			ee.wait()
 			break
 
 def c_e_th():
 	print('event tid',os.getpid(),'is starting...')
 	et=threading.Thread(target=efunc,name='event_tid='+str(os.getpid()))
+	wbar=threading.Thread(target=wfunc_bar,name='wfunc_bar='+str(os.getpid()))
 	et.start()
+	wbar.start()
 	et.join()
+	wbar.join()
+	pwbar=threading.Thread(target=pwfunc_bar,name='pwfunc_bar='+str(os.getpid()))
+	pwbar.start()
+	pwbar.join()
 
 def c_w_th(ths):
 	thp=[]
@@ -143,6 +181,8 @@ def c_w_th(ths):
 		a.start()
 	for b in thp:
 		b.join(4)
+	ee.set()
+	bar.value=1
 	#print('[wfunc]',os.getpid(),'wfunc is done...')
 
 def pefunc():
@@ -151,14 +191,16 @@ def pefunc():
 
 def pwfunc():
 	global allcount,alltime,reslog,ramf
-	print(os.getpid(),'pwfunc is running...')
+	print('[pwfunc]',os.getpid(),'pwfunc is running...')
 	c_w_th(ths)
 	ramf2=io.StringIO(ramf.getvalue())
 	allcount.value+=pcount
 	alltime.value+=ptime
-	print('pid =',os.getpid(),'real time:',ptime,'s\tcounts:',pcount)
+	print('\npid =',os.getpid(),'real time:',ptime,'s\tcounts:',pcount)
+	ee.set()
 	while True:
 		ram2res=ramf2.readline()
+		bar.value+=1
 		if ram2res == '':
 			break
 		try:
@@ -182,12 +224,15 @@ if __name__=='__main__':
 	ths=1024
 	#procs=os.cpu_count()
 	eq=Queue(procs)
-	task=50000
+	task=10000
 	wqs=ths*4
-#set event of procs
+	alltime=Value('i',0)
+	allcount=Value('i',0)
+	bar=Value('i',1)
+#set event
 	ee=Event()
 	ee.set()
-#set var in procs
+#set var to procs
 	pe=Process(target=pefunc)
 	pe.start()
 	wq=queue.Queue(wqs)
@@ -196,8 +241,6 @@ if __name__=='__main__':
 	wg=None
 	ptime=0
 	pcount=0
-	alltime=Value('i',0)
-	allcount=Value('i',0)
 	pw=Pool(procs)
 	for i in range(procs):
 		pw.apply_async(pwfunc)
@@ -205,5 +248,5 @@ if __name__=='__main__':
 	pe.join()
 	pw.join()
 	reslog.close()
-	print('real time:',alltime.value,'s\tcounts:',allcount.value)
+	print('\nreal time:',alltime.value,'s\tcounts:',allcount.value)
 	print('use time :',time.time()-st,'s')
