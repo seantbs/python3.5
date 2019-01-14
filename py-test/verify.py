@@ -8,18 +8,18 @@ f=open('./result.log','r+')
 t1=f.readlines()
 t2=[]
 t3=[]
-allc=0
+allc=int(input('input allc =:'))
 err=[]
 r=[]
 acc=0
 
-for i in range(5000):
+for i in range(allc):
 	t2.append(i+1)
-	if (i+1)%300 == 0:
+	if (i+1)%(allc/100) == 0 and (i+1) < allc:
 		time.sleep(0.1)
 		sys.stdout.write('\rfill list t2...'+str(i+1))
 		sys.stdout.flush()
-	elif (i+1) == 5000:
+	elif (i+1) == allc:
 		sys.stdout.write('\rfill list t2...'+str(i+1)+'\n')
 
 print('\nrunning:')
@@ -27,7 +27,7 @@ print('\nrunning:')
 for i in t2:
 	r=[]
 	c=0
-	acc=pgbar.bar(0,5000,i,82,acc)
+	pgbar.bar(5000,i,50)
 	for ii in t1:
 		if i == int(ii):
 			c+=1
