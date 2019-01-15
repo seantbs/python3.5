@@ -98,6 +98,8 @@ def wfunc():
 		std=str(wq.get())+'\n'
 		ramf.write(std)
 		bar.value+=1
+		if bar.value%500 ==0:
+			print('bar =',bar.value)
 		#print('[wfunc]',threading.current_thread().name,'is running code =\t',wq.get())
 		r=random.randint(3,5)
 		ptime+=r
@@ -126,51 +128,16 @@ def efunc():
 			ee.clear()
 			ee.wait()
 		else:
-			ee.clear()
-			print('\n[efunc]there is no more task put to eq,so efunc done.')
-			print('\n'+'*'*60+'\n')
-			break
-
-def wfunc_bar():
-	global task
-	print('\n[wfunc_bar]wfunc_bar tid',os.getpid(),'is running...')
-	print('\nwfunc is running:')
-	while True:
-		if bar.value < task:
-			pgbar.bar(task,bar.value,50)
-			time.sleep(0.1)
-		else:
-			ee.wait()
-			sys.stdout.write('\r'+'>'*50+'100.00%')
-			break
-	print('\nwaiting for wfunc thread over...')
-	
-def pwfunc_bar():
-	global task
-	ee.clear()
-	ee.wait()
-	print('\n[pwfunc_bar]wfunc_bar tid',os.getpid(),'is running...')
-	print('\nwriting to result.log file...:')
-	print('bar',bar.value)
-	while True:
-		if bar.value <= task:
-			pgbar.bar(task,bar.value,50)
-			time.sleep(0.01)
-		else:
-			ee.wait()
 			break
 
 def c_e_th():
 	print('event tid',os.getpid(),'is starting...')
 	et=threading.Thread(target=efunc,name='event_tid='+str(os.getpid()))
-	wbar=threading.Thread(target=wfunc_bar,name='wfunc_bar='+str(os.getpid()))
 	et.start()
-	wbar.start()
 	et.join()
-	wbar.join()
-	pwbar=threading.Thread(target=pwfunc_bar,name='pwfunc_bar='+str(os.getpid()))
-	pwbar.start()
-	pwbar.join()
+	print('\n[efunc]there is no more task put to eq,so efunc done.')
+	print('\nwaiting for wfunc thread over...')
+	print('\n'+'*'*60+'\n')
 
 def c_w_th(ths):
 	thp=[]
@@ -180,9 +147,8 @@ def c_w_th(ths):
 	for a in thp:
 		a.start()
 	for b in thp:
-		b.join(4)
+		b.join(5)
 	ee.set()
-	bar.value=1
 	#print('[wfunc]',os.getpid(),'wfunc is done...')
 
 def pefunc():
@@ -191,16 +157,16 @@ def pefunc():
 
 def pwfunc():
 	global allcount,alltime,reslog,ramf
-	print('[pwfunc]',os.getpid(),'pwfunc is running...')
+	print('[pwfunc]pid =',os.getpid(),'is running...')
+	n=0
 	c_w_th(ths)
 	ramf2=io.StringIO(ramf.getvalue())
 	allcount.value+=pcount
 	alltime.value+=ptime
 	print('\npid =',os.getpid(),'real time:',ptime,'s\tcounts:',pcount)
-	ee.set()
 	while True:
 		ram2res=ramf2.readline()
-		bar.value+=1
+		n+=1
 		if ram2res == '':
 			break
 		try:
@@ -224,7 +190,7 @@ if __name__=='__main__':
 	ths=1024
 	#procs=os.cpu_count()
 	eq=Queue(procs)
-	task=10000
+	task=100000
 	wqs=ths*4
 	alltime=Value('i',0)
 	allcount=Value('i',0)
