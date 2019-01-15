@@ -15,8 +15,8 @@ acc=0
 
 for i in range(allc):
 	t2.append(i+1)
-	if (i+1)%(allc/100) == 0 and (i+1) < allc:
-		time.sleep(0.1)
+	if (i+1)%(allc/1000) == 0 and (i+1) < allc:
+		time.sleep(0.01)
 		sys.stdout.write('\rfill list t2...'+str(i+1))
 		sys.stdout.flush()
 	elif (i+1) == allc:
@@ -27,7 +27,7 @@ print('\nrunning:')
 for i in t2:
 	r=[]
 	c=0
-	pgbar.bar(5000,i,50)
+	pgbar.ratio(allc,i,1000)
 	for ii in t1:
 		if i == int(ii):
 			c+=1
