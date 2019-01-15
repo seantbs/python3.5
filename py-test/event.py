@@ -43,12 +43,10 @@ def eq_put():
 		task=next(g)
 		if task != 0:
 			eql.append(task)
-			#print('[eq_put]eq put value =',task)
 			#print('[eq_put]eql :',eql)
 			eq.put(eql)
 		elif task == 0:
 			eql.append(0)
-			#print('[eq_put]eq put value =',task)
 			#print('[eq_put]eql :',eql)
 			eq.put(eql)
 			#print('[eq_put]eq put value = 0,so eq_put done.')
@@ -72,7 +70,7 @@ def eq_get():
 		we.set()
 		wq_put()
 	else:
-		print('[eq_get]eq is empty',threading.current_thread().name,'wqn =',wqn)
+		#print('[eq_get]eq is empty',threading.current_thread().name,'wqn =',wqn)
 		we.set()
 		wq_put()
 
@@ -97,9 +95,6 @@ def wfunc():
 		#ramf.write(threading.current_thread().name+' is running code =\t'+str(wq.get())+'\n')
 		std=str(wq.get())+'\n'
 		ramf.write(std)
-		bar.value+=1
-		if bar.value%500 ==0:
-			print('bar =',bar.value)
 		#print('[wfunc]',threading.current_thread().name,'is running code =\t',wq.get())
 		r=random.randint(3,5)
 		ptime+=r
@@ -135,9 +130,9 @@ def c_e_th():
 	et=threading.Thread(target=efunc,name='event_tid='+str(os.getpid()))
 	et.start()
 	et.join()
-	print('\n[efunc]there is no more task put to eq,so efunc done.')
-	print('\nwaiting for wfunc thread over...')
-	print('\n'+'*'*60+'\n')
+	print('\n[efunc]there is no more task put to eq,so efunc done.use time:',time.time()-st,'s')
+	print('waiting for wfunc thread over...')
+	print('*'*60+'\n')
 
 def c_w_th(ths):
 	thp=[]
