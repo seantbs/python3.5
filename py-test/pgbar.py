@@ -6,12 +6,10 @@ def bar(max,count,step):
 	m='>'
 	p=max/step
 	r=100/step
-	n=0
 	a=count
 	c=a/p
-	if c >= r and a < max:
-		n=c/r
-		sys.stdout.write('\r'+m*int(n)+'-'*(step-int(n))+'%.2f'%(n*p/max*100)+'%'+'='+str(a))
+	if c/r >= 1 and a < max:
+		sys.stdout.write('\r'+m*int(c)+'-'*(step-int(c))+'%.2f'%(c*p/max*100)+'%'+'='+str(a))
 		sys.stdout.flush()
 	elif a == max:
 		sys.stdout.write('\r'+m*step+'100.00%'+'='+str(a))
@@ -26,12 +24,11 @@ def ratio(max,count,step):
 		sys.stdout.flush()
 	
 if __name__=='__main__':
-	acc=0
-	c=10000
+	c=100000
 	print('\nThis is a simple propress bar test.')
 	for i in range(c):
 		i+=1
-		#bar(c,i,60)
-		ratio(c,i,75)
-		time.sleep(0.001)
+		bar(c,i,60)
+		#ratio(c,i,60)
+		time.sleep(0.0001)
 	print('\n')
