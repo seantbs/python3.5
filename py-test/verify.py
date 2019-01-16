@@ -27,7 +27,7 @@ print('\nrunning:')
 for i in t2:
 	r=[]
 	c=0
-	pgbar.ratio(allc,i,1000)
+	pgbar.bar(allc,i,1000)
 	for ii in t1:
 		if i == int(ii):
 			c+=1
