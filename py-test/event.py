@@ -52,19 +52,29 @@ def eq_put():
 	return 1
 
 def eq_get():
-	global wqs,wg,procs
+	global wqs,wg,procs,weqget
 	wqe=[]
 	wqa=None
 	wqb=None
-	if eq.empty():
-		ee.set()
-		a=wcq.get()
-		we.set()
-		wq_put()
+	print(threading.current_thread().name,'weqget =',weqget)
+	if weqget:
+		while eq.empty():
+			print(threading.current_thread().name,'ee set',ee.is_set())
+			if ee.is_set():
+				continue
+			else:
+				break
 	else:
+		we.set()
+		wfunc()
+		return
+
+	if not eq.empty():
 		wqe=eq.get()
+		print('wqe =',wqe)
 		if wqe != None:
-			print('[eq_get]wqe =',wqe)
+			weqget=True
+			#print('[eq_get]wqe =',wqe)
 			wqa=wqe.pop()
 			wqb=wqe.pop()
 			wg=wq_put_y(wqa,wqb)
@@ -72,34 +82,41 @@ def eq_get():
 			we.set()
 			wq_put()
 		elif wqe == None:
-			a=wcq.get()
-			wcq.put(None)
+			weqget=False
+			print(threading.current_thread().name,'None weqget =',weqget)
+			#a=wcq.get()
 			#print('[eq_get]eq is empty :',threading.current_thread().name)
+			ee.clear()
 			we.set()
+			wfunc()
 
 def wq_put():
-	global wg
+	global wg,weqget
 	x=None
 	try:
 		x=next(wg)
-	except StopIteration:
-		if not wcq.empty():
+	except:
+		if not wcq.empty() and weqget:
 			a=wcq.get()
-			if a != None:
-				wfunc()
-			elif a == None:
-				return
+			print('wcq get =',a)
+			wfunc()
+			return
+		elif not weqget:
+			wfunc()
+			return
 	if not wq.full() and x != None:
 		wq.put(x)
-	wfunc()
+		wfunc()
+	else:
+		wfunc()
 
 def wfunc():
-	global ptime,pcount,ramf
+	global ptime,pcount,ramf,weqget
 	a=None
 	n=0
 	while not wq.empty():
 		a=wq.get()
-		print('a =',a)
+		#print('a =\t',a)
 		std=str(a)+'\n'
 		ramf.write(std)
 		#print('[wfunc]',threading.current_thread().name,'is running code =\t',wq.get())
@@ -108,21 +125,17 @@ def wfunc():
 		pcount+=1
 		time.sleep(r)
 		n+=1
-		
-	if w_wcq():
-		we.wait()
-		wq_put()
-	else:
-		wq_put()
-
-def w_wcq():
-	if wcq.empty():
-		wcq.put(threading.current_thread().name)
+	if wcq.empty() and weqget:
+		wcq.put_nowait(threading.current_thread().name)
 		we.clear()
 		eq_get()
-		return 1
-	return 0
-	
+	elif wcq.full() and not weqget:
+		print('wcq empty',wcq.empty(),'weqget =',weqget)
+		return
+	else:
+		we.wait()
+		wq_put()
+
 def efunc():
 	print('[efunc]event tid',os.getpid(),'is running...')
 	while True:
@@ -207,12 +220,12 @@ if __name__=='__main__':
 		pass
 	os.path.exists(fname)
 
-	procs=4
-	ths=4096
+	procs=1
+	ths=7969
 	wqs=int(ths/procs)
 	#procs=os.cpu_count()
 	eq=Queue(procs)
-	task=132000
+	task=10000
 	bartask=task
 	alltime=Value('i',0)
 	allcount=Value('i',0)
@@ -220,7 +233,6 @@ if __name__=='__main__':
 
 #set var to event procs
 	ee=Event()
-	ee.set()
 	pe=Process(target=pefunc)
 	pe.start()
 
@@ -230,6 +242,7 @@ if __name__=='__main__':
 	wq=queue.Queue(wqs)
 	wcq=queue.Queue(1)
 	we=threading.Event()
+	weqget=True
 	wg=None
 	ptime=0
 	pcount=0
