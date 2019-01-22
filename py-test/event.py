@@ -232,12 +232,12 @@ if __name__=='__main__':
 		pass
 	os.path.exists(fname)
 
-	procs=4
+	procs=8
 	ths=5000
 	wqs=ths
 	#procs=os.cpu_count()
 	eq=Queue(procs)
-	task=3000000
+	task=2000000
 	bartask=task
 	alltime=Value('i',0)
 	allcount=Value('i',0)
@@ -251,7 +251,7 @@ if __name__=='__main__':
 #set var to work procs
 	reslog=open(fname,'a')
 	ramf=io.StringIO()
-	wq=queue.Queue(wqs)
+	wq=queue.Queue(procs*2)
 	wcq=queue.Queue(1)
 	we=threading.Event()
 	weqget=True
@@ -263,8 +263,8 @@ if __name__=='__main__':
 	for i in range(procs):
 		pw.apply_async(pwfunc)
 	pw.close()
-	pw.join()
 	pe.join()
+	pw.join()
 	ramf.close()
 	reslog.close()
 	
