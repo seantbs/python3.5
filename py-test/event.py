@@ -57,17 +57,16 @@ def eq_get():
 	wqa=None
 	wqb=None
 	#print(threading.current_thread().name,'weqget =',weqget,'ee set',ee.is_set())
-	if weqget:
-		while eq.empty():
+	while eq.empty():
+		if weqget and ee.is_set():
 			print(threading.current_thread().name,'weqget is true ee set',ee.is_set())
-			if ee.is_set():
-				continue
-			else:
-				break
-	else:
-		we.set()
-		wfunc()
-		return
+			continue
+		elif ee.is_set():
+			break
+		elif not weqget:
+			we.set()
+			wfunc()
+			return
 
 	if not eq.empty():
 		wqe=eq.get()
@@ -114,18 +113,17 @@ def wfunc():
 	n=0
 	while not wq.empty():
 		a=wq.get()
-		#print('a =\t',a)
+		#print('[wfunc]a =\t',a)
 		std=str(a)+'\n'
 		ramf.write(std)
-		#print('[wfunc]',threading.current_thread().name,'is running code =\t',wq.get())
-		r=random.randint(2,5)
+		r=random.randint(2,7)
 		ptime+=r
 		pcount+=1
 		time.sleep(r)
 		n+=1
 
 	if wcq.empty() and weqget:
-		wcq.put_nowait(threading.current_thread().name)
+		wcq.put(threading.current_thread().name)
 		we.clear()
 		eq_get()
 	elif wcq.full() and not weqget:
@@ -234,12 +232,12 @@ if __name__=='__main__':
 		pass
 	os.path.exists(fname)
 
-	procs=16
-	ths=2048
-	wqs=int(ths/procs)
+	procs=4
+	ths=5000
+	wqs=ths
 	#procs=os.cpu_count()
 	eq=Queue(procs)
-	task=400000
+	task=3000000
 	bartask=task
 	alltime=Value('i',0)
 	allcount=Value('i',0)
@@ -251,7 +249,7 @@ if __name__=='__main__':
 	pe.start()
 
 #set var to work procs
-	reslog=open(fname,'a+')
+	reslog=open(fname,'a')
 	ramf=io.StringIO()
 	wq=queue.Queue(wqs)
 	wcq=queue.Queue(1)
