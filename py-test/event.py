@@ -126,8 +126,9 @@ def wfunc():
 		wcq.put(threading.current_thread().name)
 		we.clear()
 		eq_get()
-	elif wcq.full() and not weqget:
+	elif not weqget:
 		#print('wcq empty',wcq.empty(),'weqget =',weqget)
+		we.set()
 		threadover+=1
 		sys.stdout.flush()
 		sys.stdout.write('\r'+threading.current_thread().name+' count:'+str(threadover))
@@ -191,7 +192,7 @@ def c_w_th(ths):
 	for a in thp:
 		a.start()
 	for b in thp:
-		b.join(0.1)
+		b.join()
 	print('\npid',os.getpid(),'thread end:',threadover)
 
 def pefunc():
@@ -203,6 +204,7 @@ def pwfunc():
 	global allcount,alltime,reslog,ramf
 	print('[pwfunc]pid =',os.getpid(),'is running...')
 	c_w_th(ths)
+
 	allcount.value+=pcount
 	alltime.value+=ptime
 	ramf2=io.StringIO(ramf.getvalue())
@@ -233,11 +235,11 @@ if __name__=='__main__':
 	os.path.exists(fname)
 
 	procs=8
-	ths=5000
+	ths=3000
 	wqs=ths
 	#procs=os.cpu_count()
 	eq=Queue(procs)
-	task=2000000
+	task=100000
 	bartask=task
 	alltime=Value('i',0)
 	allcount=Value('i',0)
