@@ -83,27 +83,27 @@ def eq_get():
 			weqget=False
 			print(threading.current_thread().name,'none ee set:',ee.is_set())
 			ee.set()
-			#we.set()
+			we.set()
 			wfunc()
 
 def wq_put():
 	global wg,weqget
 	x=None
 	a=None
-	try:
-		x=next(wg)
-	except:
-		if wcq.full() and weqget:
-			a=wcq.get()
-			print('[wq_put]wcq get :',a)
+	if weqget:
+		try:
+			x=next(wg)
+		except:
+			if wcq.full():
+				a=wcq.get()
+				print('[wq_put]wcq get :',a)
+				wfunc()
+				return
+		if not wq.full() and x != None:
+			wq.put(x)
 			wfunc()
-			return
-		elif not weqget:
+		else:
 			wfunc()
-			return
-	if not wq.full() and x != None:
-		wq.put(x)
-		wfunc()
 	else:
 		wfunc()
 
@@ -128,7 +128,6 @@ def wfunc():
 		eq_get()
 	elif not weqget:
 		#print('wcq empty',wcq.empty(),'weqget =',weqget)
-		we.set()
 		threadover+=1
 		sys.stdout.flush()
 		sys.stdout.write('\r'+threading.current_thread().name+' count:'+str(threadover))
@@ -158,6 +157,7 @@ def efunc():
 				ee.wait()
 				ee.clear()
 		ee.wait()
+	ee.clear()
 
 def wfunc_bar():
 	global bartask,st
@@ -234,8 +234,8 @@ if __name__=='__main__':
 		pass
 	os.path.exists(fname)
 
-	procs=8
-	ths=3000
+	procs=4
+	ths=1000
 	wqs=ths
 	#procs=os.cpu_count()
 	eq=Queue(procs)
