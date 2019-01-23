@@ -61,7 +61,7 @@ def eq_get():
 		if weqget and ee.is_set():
 			print(threading.current_thread().name,'weqget is true ee set',ee.is_set())
 			continue
-		elif ee.is_set():
+		elif not ee.is_set():
 			break
 		elif not weqget:
 			we.set()
@@ -89,14 +89,14 @@ def eq_get():
 def wq_put():
 	global wg,weqget
 	x=None
-	a=None
+	y=None
 	if weqget:
 		try:
 			x=next(wg)
 		except:
 			if wcq.full():
-				a=wcq.get()
-				print('[wq_put]wcq get :',a)
+				y=wcq.get()
+				print('[wq_put]wcq get :',y)
 				wfunc()
 				return
 		if not wq.full() and x != None:
@@ -109,12 +109,11 @@ def wq_put():
 
 def wfunc():
 	global ptime,pcount,ramf,threadover,weqget
-	a=None
+	x=None
 	n=0
 	while not wq.empty():
-		a=wq.get()
-		#print('[wfunc]a =\t',a)
-		std=str(a)+'\n'
+		x=wq.get()
+		std=str(x)+'\n'
 		ramf.write(std)
 		r=random.randint(2,7)
 		ptime+=r
@@ -235,7 +234,7 @@ if __name__=='__main__':
 	os.path.exists(fname)
 
 	procs=4
-	ths=1000
+	ths=2000
 	wqs=ths
 	#procs=os.cpu_count()
 	eq=Queue(procs)
