@@ -34,12 +34,12 @@ def wq_put_y(a,b):
 def eq_put():
 	global task,wqs,procs
 	#print('[eq_put]',threading.current_thread().name,'prepare value...')
-	g=eq_put_y(task,wqs,procs)
+	eg=eq_put_y(task,wqs,procs)
 	while not eq.full():
 		eql=[]
 		#print('[eq_put]task =',task)
 		eql.append(task)
-		task=next(g)
+		task=next(eg)
 		if task != 0:
 			eql.append(task)
 			#print('[eq_put]eql :',eql)
@@ -77,7 +77,6 @@ def eq_get():
 			wqb=wqe.pop()
 			wg=wq_put_y(wqa,wqb)
 			ee.set()
-			we.set()
 			wq_put()
 		elif wqe == None:
 			weqget=False
@@ -87,23 +86,22 @@ def eq_get():
 			wfunc()
 
 def wq_put():
-	global wg,weqget
+	global wg,weqget,test
 	x=None
 	y=None
-	if weqget:
-		try:
-			x=next(wg)
-		except:
-			if wcq.full():
-				y=wcq.get()
-				print('[wq_put]wcq get :',y)
-				wfunc()
-				return
-		if not wq.full() and x != None:
-			wq.put(x)
+	test+=1
+	try:
+		x=next(wg)
+	except:
+		if wcq.full():
+			y=wcq.get()
+			print('[wq_put]wcq get :',y)
 			wfunc()
-		else:
-			wfunc()
+			return
+	we.set()
+	if not wq.full() and x != None:
+		wq.put(x)
+		wfunc()
 	else:
 		wfunc()
 
@@ -113,7 +111,7 @@ def wfunc():
 	n=0
 	while not wq.empty():
 		x=wq.get()
-		std=str(x)+'\n'
+		std=str(bartask-x)+','+str(x)+'\n'
 		ramf.write(std)
 		r=random.randint(2,7)
 		ptime+=r
@@ -125,11 +123,10 @@ def wfunc():
 		wcq.put(threading.current_thread().name)
 		we.clear()
 		eq_get()
-	elif not weqget:
-		#print('wcq empty',wcq.empty(),'weqget =',weqget)
-		threadover+=1
-		sys.stdout.flush()
-		sys.stdout.write('\r'+threading.current_thread().name+' count:'+str(threadover))
+	elif not weqget and wcq.empty():
+		#threadover+=1
+		#sys.stdout.flush()
+		#sys.stdout.write('\r'+threading.current_thread().name+' count:'+str(threadover))
 		return
 	else:
 		we.wait()
@@ -143,20 +140,23 @@ def efunc():
 		x=eq_put()
 		if x:
 			ee.clear()
+			ee.wait()
 		else:
-			n=0
-			while True:
-				if not eq.full():
-					n+=1
-					#print('n =',n)
-					if n <= procs:
-						eq.put(None)
-					elif n > procs and eq.empty():
-						return
-				ee.wait()
+			break
+	n=0
+	while True:
+		if not eq.full():
+			n+=1
+			#print('n =',n)
+			if n <= procs:
+				eq.put(None)
 				ee.clear()
+				ee.wait()
+			elif n > procs and eq.empty():
+				ee.clear()
+				return
+		ee.clear()
 		ee.wait()
-	ee.clear()
 
 def wfunc_bar():
 	global bartask,st
@@ -169,7 +169,7 @@ def wfunc_bar():
 			ee.set()
 			break
 		#print('count =',count)
-		time.sleep(0.01)
+		time.sleep(0.1)
 
 def c_e_th():
 	print('event tid',os.getpid(),'is starting...')
@@ -179,6 +179,7 @@ def c_e_th():
 	#wbar.start()
 	et.join()
 	#wbar.join()
+	eg=None
 	print('\n[efunc]there is no more task so efunc done.use time:%.2f' % (time.time()-st)+'s')
 	print('='*60+'\n')
 	print('waiting for wfunc thread over...')
@@ -191,8 +192,9 @@ def c_w_th(ths):
 	for a in thp:
 		a.start()
 	for b in thp:
-		b.join()
-	print('\npid',os.getpid(),'thread end:',threadover)
+		b.join(7)
+	wg=None
+	#print('\npid',os.getpid(),'thread end:',threadover)
 
 def pefunc():
 	print(os.getpid(),'pefunc is running...')
@@ -200,13 +202,13 @@ def pefunc():
 	print('pefunc is quit...')
 
 def pwfunc():
-	global allcount,alltime,reslog,ramf
+	global allcount,alltime,reslog,ramf,test
 	print('[pwfunc]pid =',os.getpid(),'is running...')
 	c_w_th(ths)
-
+	print('test =',test)
 	allcount.value+=pcount
 	alltime.value+=ptime
-	ramf2=io.StringIO(ramf.getvalue())
+	ramf=io.StringIO(ramf.getvalue())
 	while True:
 		ram2res=ramf2.readline()
 		if ram2res == '':
@@ -233,12 +235,12 @@ if __name__=='__main__':
 		pass
 	os.path.exists(fname)
 
-	procs=4
-	ths=2000
+	procs=int(input('set procs:'))
+	ths=int(input('set thread count:'))
 	wqs=ths
 	#procs=os.cpu_count()
 	eq=Queue(procs)
-	task=100000
+	task=int(input('set task count:'))
 	bartask=task
 	alltime=Value('i',0)
 	allcount=Value('i',0)
@@ -250,9 +252,10 @@ if __name__=='__main__':
 	pe.start()
 
 #set var to work procs
-	reslog=open(fname,'a')
+	reslog=open(fname,'a+')
 	ramf=io.StringIO()
-	wq=queue.Queue(procs*2)
+	w2ram=''
+	wq=queue.Queue(wqs)
 	wcq=queue.Queue(1)
 	we=threading.Event()
 	weqget=True
@@ -260,12 +263,13 @@ if __name__=='__main__':
 	ptime=0
 	pcount=0
 	threadover=0
+	test=0
 	pw=Pool(procs)
 	for i in range(procs):
 		pw.apply_async(pwfunc)
 	pw.close()
-	pe.join()
 	pw.join()
+	pe.join()
 	ramf.close()
 	reslog.close()
 	
