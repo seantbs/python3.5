@@ -140,8 +140,8 @@ def wfunc():
 		eq_get()
 	elif not weqget and not wcq.empty():
 		#print('[wfunc]',threading.current_thread().name,'is wait to done...','we set',we.is_set())
-		we.clear()
-		we.wait()
+		#we.clear()
+		#we.wait()
 		return
 	else:
 		#print('[wfunc]',threading.current_thread().name,'wq is empty we set',we.is_set())
@@ -205,7 +205,7 @@ def c_w_th(ths):
 	for a in thp:
 		a.start()
 	for b in thp:
-		b.join()
+		b.join(2)
 
 def pefunc():
 	print(os.getpid(),'pefunc is running...')
