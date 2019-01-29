@@ -118,8 +118,8 @@ def wfunc():
 	global ptime,pcount,ramf,threadover,weqget
 	x=None
 	n=0
-	text=''
 	while not wq.empty():
+		text=''
 		x=wq.get()
 		r=random.randint(2,8)
 		for i in range(r):
@@ -205,7 +205,7 @@ def c_w_th(ths):
 	for a in thp:
 		a.start()
 	for b in thp:
-		b.join(2)
+		b.join(0.5)
 
 def pefunc():
 	print(os.getpid(),'pefunc is running...')
