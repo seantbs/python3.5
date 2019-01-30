@@ -107,7 +107,7 @@ def wq_put():
 			wfunc()
 			return
 
-	print('[wq_put]',threading.current_thread().name,'x =',x,'we set',we.is_set())
+	#print('[wq_put]',threading.current_thread().name,'x =',x,'we set',we.is_set())
 	if not wq.full():
 		wq.put(x)
 		wfunc()
@@ -121,7 +121,7 @@ def wfunc():
 	while not wq.empty():
 		text=''
 		x=wq.get()
-		r=random.randint(2,8)
+		r=random.randint(2,6)
 		for i in range(r):
 			text+='a'
 			time.sleep(1)
@@ -145,7 +145,7 @@ def wfunc():
 		return
 	else:
 		#print('[wfunc]',threading.current_thread().name,'wq is empty we set',we.is_set())
-		we.wait()
+		we.wait(2)
 		wq_put()
 
 def efunc():
@@ -155,9 +155,9 @@ def efunc():
 		x=None
 		x=eq_put()
 		if x:
-			
 			ee.clear()
 			ee.wait()
+			et.set()
 		else:
 			break
 	n=0
@@ -169,22 +169,41 @@ def efunc():
 				eq.put(None)
 			elif n > procs and eq.empty():
 				ee.clear()
+				et.set()
 				return
 		ee.clear()
 		ee.wait()
 
 def resbf_flush():
-	global resbf,reslog,errline
-	while not resbf.empty():
-		
-		errline+=1
-		x=resbf.get()
-		try:
-			reslog.write(x)
-		except:
-			print('reslog write erroe at line:',errline,x)
-			continue
-	reslog.flush()
+	global resbf,reslog,errline,task
+	while True:
+		resqsize=resbf.qsize()
+		print('[resbf_flus]resbf qsize =',resqsize)
+		if task != 0 and resqsize != 0:
+			for i in range(resqsize):
+				errline+=1
+				v=resbf.get()
+				print('[resbf_flush]x =',v)
+				try:
+					reslog.write(v)
+				except:
+					print('reslog write erroe at line:',errline,x)
+					continue
+		elif task == 0:
+			while not resbf.empty():
+				x=resbf.get()
+				print('[resbf_flush]x =',x)
+				try:
+					reslog.write(x)
+				except:
+					print('reslog write erroe at line:',errline,x)
+					continue
+			reslog.flush()
+			reslog.close()
+			return
+		reslog.flush()
+		et.clear()
+		et.wait()
 
 def wfunc_bar():
 	global bartask,st
@@ -200,15 +219,16 @@ def wfunc_bar():
 		time.sleep(0.5)
 
 def c_e_th():
-	print('event tid',os.getpid(),'is starting...')
+	print('event tid',threading.current_thread().name,'is starting...')
+	print('res_save_tid',threading.current_thread().name,'is starting...')
 	pevent=threading.Thread(target=efunc,name='pevent_tid='+str(os.getpid()))
 	res_save=threading.Thread(target=resbf_flush,name='res_save_tid='+str(os.getpid()))
 	#wbar=threading.Thread(target=wfunc_bar,name='wbar_tid='+str(os.getpid()))
 	#wbar.start()
 	pevent.start()
 	res_save.start()
-	pevent.join()
 	res_save.join()
+	pevent.join()
 	#wbar.join()
 	print('\n[efunc]there is no more task so efunc done.use time:%.2f' % (time.time()-st)+'s')
 	print('='*60+'\n')
@@ -222,7 +242,7 @@ def c_w_th(ths):
 	for a in thp:
 		a.start()
 	for b in thp:
-		b.join(2)
+		b.join(4)
 
 def pefunc():
 	print(os.getpid(),'pefunc is running...')
@@ -230,30 +250,17 @@ def pefunc():
 	print('pefunc done...')
 
 def pwfunc():
-	global allcount,alltime,test
+	global allcount,alltime
 	print('[pwfunc]pid =',os.getpid(),'is running...')
 	c_w_th(ths)
 	allcount.value+=pcount
 	alltime.value+=ptime
-
 	print('\npid='+str(os.getpid())+' real time: '+str(ptime)+'s\tcounts:'+str(pcount))
 	print('[wfunc]'+str(os.getpid())+' wfunc is done use time:%.2f' % (time.time()-st)+'s')
 
 if __name__=='__main__':
 	st=time.time()
-
-#main public var
-	fname='./result.log'
-	try:
-		os.remove(fname)
-	except:
-		pass
-	os.path.exists(fname)
-	reslog=open(fname,'a')
-	resbf=Queue()
-	errline=0
-	bf=0
-	
+#public var set
 	procs=int(input('set procs:'))-1
 	ths=int(input('set thread count:'))
 	wqs=ths
@@ -265,11 +272,23 @@ if __name__=='__main__':
 	allcount=Value('i',0)
 	bar=Value('i',1)
 
+#log file set
+	fname='./result.log'
+	try:
+		os.remove(fname)
+	except:
+		pass
+	os.path.exists(fname)
+	reslog=open(fname,'a')
+	resbf=Queue()
+	errline=0
+
 #set var to event procs
 	ee=Event()
 	et=threading.Event()
 	pe=Process(target=pefunc)
 	pe.start()
+	del et
 
 #set var to work procs
 	wq=queue.Queue(wqs)
@@ -287,8 +306,6 @@ if __name__=='__main__':
 	pw.close()
 	pw.join()
 	pe.join()
-
-	reslog.close()
 	
 	print('\nreal time: '+str(alltime.value)+'s\tcounts: '+str(allcount.value))
 	print('use time: %.2f' % (time.time()-st)+'s')
