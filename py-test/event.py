@@ -115,7 +115,7 @@ def wq_put():
 		wfunc()
 
 def wfunc():
-	global ptime,pcount,ramf,threadover,weqget
+	global ptime,pcount,resbf,threadover,weqget
 	x=None
 	n=0
 	while not wq.empty():
@@ -126,7 +126,7 @@ def wfunc():
 			text+='a'
 			time.sleep(1)
 		std=str(x)+','+text+'\n'
-		ramf.write(std)
+		resbf.put(std)
 		ptime+=r
 		pcount+=1
 		n+=1
@@ -155,6 +155,7 @@ def efunc():
 		x=None
 		x=eq_put()
 		if x:
+			
 			ee.clear()
 			ee.wait()
 		else:
@@ -172,6 +173,19 @@ def efunc():
 		ee.clear()
 		ee.wait()
 
+def resbf_flush():
+	global resbf,reslog,errline
+	while not resbf.empty():
+		
+		errline+=1
+		x=resbf.get()
+		try:
+			reslog.write(x)
+		except:
+			print('reslog write erroe at line:',errline,x)
+			continue
+	reslog.flush()
+
 def wfunc_bar():
 	global bartask,st
 	while True:
@@ -187,11 +201,14 @@ def wfunc_bar():
 
 def c_e_th():
 	print('event tid',os.getpid(),'is starting...')
-	et=threading.Thread(target=efunc,name='event_tid='+str(os.getpid()))
+	pevent=threading.Thread(target=efunc,name='pevent_tid='+str(os.getpid()))
+	res_save=threading.Thread(target=resbf_flush,name='res_save_tid='+str(os.getpid()))
 	#wbar=threading.Thread(target=wfunc_bar,name='wbar_tid='+str(os.getpid()))
-	et.start()
 	#wbar.start()
-	et.join()
+	pevent.start()
+	res_save.start()
+	pevent.join()
+	res_save.join()
 	#wbar.join()
 	print('\n[efunc]there is no more task so efunc done.use time:%.2f' % (time.time()-st)+'s')
 	print('='*60+'\n')
@@ -205,7 +222,7 @@ def c_w_th(ths):
 	for a in thp:
 		a.start()
 	for b in thp:
-		b.join(0.5)
+		b.join(2)
 
 def pefunc():
 	print(os.getpid(),'pefunc is running...')
@@ -213,24 +230,11 @@ def pefunc():
 	print('pefunc done...')
 
 def pwfunc():
-	global allcount,alltime,reslog,ramf,test
+	global allcount,alltime,test
 	print('[pwfunc]pid =',os.getpid(),'is running...')
 	c_w_th(ths)
 	allcount.value+=pcount
 	alltime.value+=ptime
-	ramf2=io.StringIO(ramf.getvalue())
-	while True:
-		ram2res=ramf2.readline()
-		if ram2res == '':
-			break
-		else:
-			try:
-				reslog.write(ram2res)
-			except:
-				print('test.log write erroe at line:',ram2res)
-				continue
-	reslog.flush()
-	ramf2.close()
 
 	print('\npid='+str(os.getpid())+' real time: '+str(ptime)+'s\tcounts:'+str(pcount))
 	print('[wfunc]'+str(os.getpid())+' wfunc is done use time:%.2f' % (time.time()-st)+'s')
@@ -245,8 +249,12 @@ if __name__=='__main__':
 	except:
 		pass
 	os.path.exists(fname)
-
-	procs=int(input('set procs:'))
+	reslog=open(fname,'a')
+	resbf=Queue()
+	errline=0
+	bf=0
+	
+	procs=int(input('set procs:'))-1
 	ths=int(input('set thread count:'))
 	wqs=ths
 	#procs=os.cpu_count()
@@ -259,13 +267,11 @@ if __name__=='__main__':
 
 #set var to event procs
 	ee=Event()
+	et=threading.Event()
 	pe=Process(target=pefunc)
 	pe.start()
 
 #set var to work procs
-	reslog=open(fname,'a')
-	ramf=io.StringIO()
-
 	wq=queue.Queue(wqs)
 	wcq=queue.Queue(1)
 	we=threading.Event()
@@ -281,7 +287,7 @@ if __name__=='__main__':
 	pw.close()
 	pw.join()
 	pe.join()
-	ramf.close()
+
 	reslog.close()
 	
 	print('\nreal time: '+str(alltime.value)+'s\tcounts: '+str(allcount.value))
