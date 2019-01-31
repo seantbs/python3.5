@@ -169,45 +169,55 @@ def efunc():
 				eq.put(None)
 			elif n > procs and eq.empty():
 				ee.clear()
+				et.set()
 				return
 		ee.clear()
 		ee.wait()
 
+def resbf_y(qsize):
+	for i in ragne(procs):
+		if qsize > procs:
+			yield int((qsize-qsize%procs)/procs)
+
 def resbf_flush():
 	global resbf,reslog,errline,task
 	while True:
-		et.clear()
 		et.wait()
-		resqsize=resbf.qsize()
-		if task != 0 and resqsize != 0:
-			print('[resbf_flus]task!=0,resbf qsize =',resqsize)
-			for i in range(resqsize):
+		resbfqs=resbf.qsize()
+		
+		print('[resbf_flus]task!=0,resbf qsize =',resbfqs)
+		for i in range(resbfqs):
+			errline+=1
+			try:
+				v=resbf.get()
+			except:
+				break
+			try:
+				reslog.write(v)
+			except:
+				print('reslog write erroe at line:',errline,v)
+				continue
+		reslog.flush()
+		if task != 0:
+			et.clear()
+			continue
+		else:
+			et.clear()
+			et.wait()
+			ee.clear()
+			ee.wait()
+			print('last resbf size ;',resbf.qsize())
+			while not resbf.empty():
 				errline+=1
 				v=resbf.get()
-				#print('[resbf_flush]x =',v)
 				try:
 					reslog.write(v)
 				except:
 					print('reslog write erroe at line:',errline,v)
 					continue
-		elif resqsize == 0:
-			continue
-		else:
-			et.clear()
-			et.wait()
-			while not resbf.empty():
-				x=resbf.get()
-				#print('[resbf_flush]x =',x)
-				try:
-					reslog.write(x)
-				except:
-					print('reslog write erroe at line:',errline,x)
-					continue
+			print('[resbf_flush]resbf is over......')
 			reslog.flush()
-			reslog.close()
-			print('[resbf_flush]is it over...?',resbf.qsize())
 			return
-		reslog.flush()
 
 def wfunc_bar():
 	global bartask,st
@@ -223,23 +233,27 @@ def wfunc_bar():
 		time.sleep(0.5)
 
 def c_e_th():
-	print('event tid',threading.current_thread().name,'is starting...')
-	print('res_save_tid',threading.current_thread().name,'is starting...')
-	pevent=threading.Thread(target=efunc,name='pevent_tid='+str(os.getpid()))
-	res_save=threading.Thread(target=resbf_flush,name='res_save_tid='+str(os.getpid()))
+	global procs
+	thp=[]
+	print('event tid',os.getpid(),'is starting...')
+	print('res_save_tid',os.getpid(),'is starting...')
+	pevent=threading.Thread(target=efunc,name='pevent_tid='+str(os.getpid
+	pevent.start()
+	for i in range(procs):
+		res=threading.Thread(target=resbf_flush,name='res_save_tid='+str(os.getpid()))
+		thp.append(res)
+	for a in thp:
+		a.start()
+	for b in thp:
+		b.join()
 	#wbar=threading.Thread(target=wfunc_bar,name='wbar_tid='+str(os.getpid()))
 	#wbar.start()
-	pevent.start()
-	res_save.start()
 	pevent.join()
-	res_save.join()
-	#wbar.join()
-	print('ee set',ee.is_set())
-	print('\n[efunc]there is no more task so efunc done.use time:%.2f' % (time.time()-st)+'s')
+	print('\n[efunc]there is no more task so efunc done,efunc use time:%.2f' % (time.time()-st)+'s')
 	print('='*60)
 	print('waiting for wfunc thread over...')
-	et.set()
-	print('is it over???')
+	print('[c_e_th]ee set:',ee.is_set())
+	#wbar.join()
 
 def c_w_th(ths):
 	thp=[]
@@ -249,7 +263,7 @@ def c_w_th(ths):
 	for a in thp:
 		a.start()
 	for b in thp:
-		b.join(4)
+		b.join(2)
 
 def pefunc():
 	print(os.getpid(),'pefunc is running...')
@@ -260,13 +274,11 @@ def pwfunc():
 	global allcount,alltime
 	print('[pwfunc]pid =',os.getpid(),'is running...')
 	c_w_th(ths)
-	resbf.put(None)
-	print(resbf.qsize())
-	#print('[pwfunc]resbf qsize',resbf.qsize())
 	allcount.value+=pcount
 	alltime.value+=ptime
-	print('pid='+str(os.getpid())+' real time: '+str(ptime)+'s\tcounts:'+str(pcount))
+	print('\npid='+str(os.getpid())+' real time: '+str(ptime)+'s\tcounts:'+str(pcount))
 	print('[wfunc]'+str(os.getpid())+' wfunc is done use time:%.2f' % (time.time()-st)+'s')
+	#print('[pwfunc]resbf qsize',resbf.qsize())
 
 def delcache():
 	cachedir='__pycache__'
@@ -331,9 +343,10 @@ if __name__=='__main__':
 		pw.apply_async(pwfunc)
 	pw.close()
 	pw.join()
+	print('main ee set',ee.is_set())
 	ee.set()
 	pe.join()
+	print('resbf size ;',resbf.qsize())
 
-	
 	print('\nreal time: '+str(alltime.value)+'s\tcounts: '+str(allcount.value))
 	print('use time: %.2f' % (time.time()-st)+'s')
