@@ -125,7 +125,7 @@ def wfunc():
 		for i in range(r):
 			text+='a'
 			time.sleep(1)
-		std=str(x)+','+text+'\n'
+		std=str(x)+'\t'+text+'\n'
 		resbf.put(std)
 		ptime+=r
 		pcount+=1
@@ -169,7 +169,6 @@ def efunc():
 				eq.put(None)
 			elif n > procs and eq.empty():
 				ee.clear()
-				et.set()
 				return
 		ee.clear()
 		ee.wait()
@@ -177,22 +176,28 @@ def efunc():
 def resbf_flush():
 	global resbf,reslog,errline,task
 	while True:
+		et.clear()
+		et.wait()
 		resqsize=resbf.qsize()
-		print('[resbf_flus]resbf qsize =',resqsize)
 		if task != 0 and resqsize != 0:
+			print('[resbf_flus]task!=0,resbf qsize =',resqsize)
 			for i in range(resqsize):
 				errline+=1
 				v=resbf.get()
-				print('[resbf_flush]x =',v)
+				#print('[resbf_flush]x =',v)
 				try:
 					reslog.write(v)
 				except:
-					print('reslog write erroe at line:',errline,x)
+					print('reslog write erroe at line:',errline,v)
 					continue
-		elif task == 0:
+		elif resqsize == 0:
+			continue
+		else:
+			et.clear()
+			et.wait()
 			while not resbf.empty():
 				x=resbf.get()
-				print('[resbf_flush]x =',x)
+				#print('[resbf_flush]x =',x)
 				try:
 					reslog.write(x)
 				except:
@@ -200,10 +205,9 @@ def resbf_flush():
 					continue
 			reslog.flush()
 			reslog.close()
+			print('[resbf_flush]is it over...?',resbf.qsize())
 			return
 		reslog.flush()
-		et.clear()
-		et.wait()
 
 def wfunc_bar():
 	global bartask,st
@@ -227,12 +231,15 @@ def c_e_th():
 	#wbar.start()
 	pevent.start()
 	res_save.start()
-	res_save.join()
 	pevent.join()
+	res_save.join()
 	#wbar.join()
+	print('ee set',ee.is_set())
 	print('\n[efunc]there is no more task so efunc done.use time:%.2f' % (time.time()-st)+'s')
-	print('='*60+'\n')
+	print('='*60)
 	print('waiting for wfunc thread over...')
+	et.set()
+	print('is it over???')
 
 def c_w_th(ths):
 	thp=[]
@@ -247,16 +254,34 @@ def c_w_th(ths):
 def pefunc():
 	print(os.getpid(),'pefunc is running...')
 	c_e_th()
-	print('pefunc done...')
+	print('[pefunc]pefunc done......')
 
 def pwfunc():
 	global allcount,alltime
 	print('[pwfunc]pid =',os.getpid(),'is running...')
 	c_w_th(ths)
+	resbf.put(None)
+	print(resbf.qsize())
+	#print('[pwfunc]resbf qsize',resbf.qsize())
 	allcount.value+=pcount
 	alltime.value+=ptime
-	print('\npid='+str(os.getpid())+' real time: '+str(ptime)+'s\tcounts:'+str(pcount))
+	print('pid='+str(os.getpid())+' real time: '+str(ptime)+'s\tcounts:'+str(pcount))
 	print('[wfunc]'+str(os.getpid())+' wfunc is done use time:%.2f' % (time.time()-st)+'s')
+
+def delcache():
+	cachedir='__pycache__'
+	try:
+		os.chdir(cachedir)
+	except:
+		return
+	flist=os.listdir()
+	while True:
+		try:
+			os.remove(flist.pop())
+		except:
+			os.rmdir('../'+cachedir)
+			os.chdir('../')
+			return
 
 if __name__=='__main__':
 	st=time.time()
@@ -273,6 +298,7 @@ if __name__=='__main__':
 	bar=Value('i',1)
 
 #log file set
+	delcache()
 	fname='./result.log'
 	try:
 		os.remove(fname)
@@ -305,7 +331,9 @@ if __name__=='__main__':
 		pw.apply_async(pwfunc)
 	pw.close()
 	pw.join()
+	ee.set()
 	pe.join()
+
 	
 	print('\nreal time: '+str(alltime.value)+'s\tcounts: '+str(allcount.value))
 	print('use time: %.2f' % (time.time()-st)+'s')
