@@ -99,7 +99,7 @@ def wq_put():
 	except:
 		if not wcq.empty() and weqget:
 			we.clear()
-			wcq.get()
+			wcq.get_nowait()
 			wfunc()
 			return
 		else:
@@ -109,7 +109,7 @@ def wq_put():
 
 	#print('[wq_put]',threading.current_thread().name,'x =',x,'we set',we.is_set())
 	if not wq.full():
-		wq.put(x)
+		wq.put_nowait(x)
 		wfunc()
 	else:
 		wfunc()
@@ -120,20 +120,20 @@ def wfunc():
 	n=0
 	while not wq.empty():
 		text=''
-		x=wq.get()
+		x=wq.get_nowait()
 		r=random.randint(2,6)
 		for i in range(r):
 			text+='a'
 			time.sleep(1)
 		std=str(x)+'\t'+text+'\n'
-		resbf.put(std)
+		resbf.put_nowait(std)
 		ptime+=r
 		pcount+=1
 		n+=1
 
 	if wcq.empty() and weqget:
 		try:
-			wcq.put(threading.current_thread().name)
+			wcq.put_nowait(threading.current_thread().name)
 		except:
 			wfunc()
 		#print('[wfunc]',threading.current_thread().name,'wcq empty',wcq.empty(),'we set',we.is_set())
@@ -159,6 +159,7 @@ def efunc():
 			ee.wait()
 			et.set()
 		else:
+			et.clear()
 			break
 	n=0
 	while True:
@@ -174,22 +175,22 @@ def efunc():
 		ee.clear()
 		ee.wait()
 
-def resbf_y(qsize):
-	for i in ragne(procs):
-		if qsize > procs:
-			yield int((qsize-qsize%procs)/procs)
-
 def resbf_flush():
-	global resbf,reslog,errline,task
+	global resbf,reslog,errline,task,procs
+	et.clear()
 	while True:
 		et.wait()
 		resbfqs=resbf.qsize()
-		
-		print('[resbf_flus]task!=0,resbf qsize =',resbfqs)
-		for i in range(resbfqs):
+		#print('[resbf_flus]task!=0,resbf qsize =',resbfqs)
+		if resbfqs >= procs:
+			thqs=int((resbfqs-resbfqs%procs)/procs)
+		else:
+			thqs=resbfqs
+		#print('[resbf_flus]task!=0,thqs =',thqs)
+		for i in range(thqs):
 			errline+=1
 			try:
-				v=resbf.get()
+				v=resbf.get_nowait()
 			except:
 				break
 			try:
@@ -202,20 +203,22 @@ def resbf_flush():
 			et.clear()
 			continue
 		else:
-			et.clear()
+			#print('[resbf_flush]1 et set:',et.is_set(),'ee set:',ee.is_set())
 			et.wait()
-			ee.clear()
+			#print('[resbf_flush]2 et set:',et.is_set(),'ee set:',ee.is_set())
 			ee.wait()
 			print('last resbf size ;',resbf.qsize())
 			while not resbf.empty():
 				errline+=1
-				v=resbf.get()
+				try:
+					v=resbf.get_nowait()
+				except:
+					continue
 				try:
 					reslog.write(v)
 				except:
 					print('reslog write erroe at line:',errline,v)
 					continue
-			print('[resbf_flush]resbf is over......')
 			reslog.flush()
 			return
 
@@ -237,21 +240,22 @@ def c_e_th():
 	thp=[]
 	print('event tid',os.getpid(),'is starting...')
 	print('res_save_tid',os.getpid(),'is starting...')
-	pevent=threading.Thread(target=efunc,name='pevent_tid='+str(os.getpid
+	pevent=threading.Thread(target=efunc,name='pevent_tid='+str(os.getpid()))
 	pevent.start()
 	for i in range(procs):
-		res=threading.Thread(target=resbf_flush,name='res_save_tid='+str(os.getpid()))
+		res=threading.Thread(target=resbf_flush,name='res_save_tid='+str(os.getpid())+'/'+str(i))
 		thp.append(res)
 	for a in thp:
 		a.start()
 	for b in thp:
 		b.join()
+	print('[c_e_th]resbf is over......')
+	pevent.join()
 	#wbar=threading.Thread(target=wfunc_bar,name='wbar_tid='+str(os.getpid()))
 	#wbar.start()
-	pevent.join()
-	print('\n[efunc]there is no more task so efunc done,efunc use time:%.2f' % (time.time()-st)+'s')
+	print('\n[c_e_th]there is no more task so efunc done,efunc use time:%.2f' % (time.time()-st)+'s')
 	print('='*60)
-	print('waiting for wfunc thread over...')
+	print('[c_e_th]waiting for wfunc thread over...')
 	print('[c_e_th]ee set:',ee.is_set())
 	#wbar.join()
 
@@ -276,8 +280,9 @@ def pwfunc():
 	c_w_th(ths)
 	allcount.value+=pcount
 	alltime.value+=ptime
-	print('\npid='+str(os.getpid())+' real time: '+str(ptime)+'s\tcounts:'+str(pcount))
-	print('[wfunc]'+str(os.getpid())+' wfunc is done use time:%.2f' % (time.time()-st)+'s')
+	print('\n[pwfunc]pid='+str(os.getpid())+' real time: '+str(ptime)+'s\tcounts:'+str(pcount))
+	print('[pwfunc]'+str(os.getpid())+' wfunc is done use time:%.2f' % (time.time()-st)+'s')
+	#print('[pwfunc]ee set',ee.is_set())
 	#print('[pwfunc]resbf qsize',resbf.qsize())
 
 def delcache():
@@ -343,10 +348,11 @@ if __name__=='__main__':
 		pw.apply_async(pwfunc)
 	pw.close()
 	pw.join()
-	print('main ee set',ee.is_set())
 	ee.set()
+	print('main ee set',ee.is_set())
 	pe.join()
 	print('resbf size ;',resbf.qsize())
+	reslog.close()
 
 	print('\nreal time: '+str(alltime.value)+'s\tcounts: '+str(allcount.value))
 	print('use time: %.2f' % (time.time()-st)+'s')
