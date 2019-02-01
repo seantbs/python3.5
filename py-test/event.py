@@ -270,7 +270,7 @@ def c_w_th(ths):
 	for b in thp:
 		b.join()
 	print('\n[c_w_th]',os.getpid(),'wq unfinished tasks :',wq.unfinished_tasks)
-	print('main ee set',ee.is_set())
+	print('main ee set',ee.is_set(),'|resbf qsize:',resbf.qsize())
 	ee.set()
 
 def pefunc():
