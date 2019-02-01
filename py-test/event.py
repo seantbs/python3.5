@@ -169,7 +169,6 @@ def resbf_flush(ps):
 	global resbf,reslog,errline,task
 	while True:
 		et.wait()
-		et.clear()
 		resbfqs=resbf.qsize()
 		#print('[resbf_flus]task!=0,resbf qsize =',resbfqs)
 		if resbfqs >= ps:
@@ -190,12 +189,13 @@ def resbf_flush(ps):
 				continue
 		reslog.flush()
 		if task != 0:
+			et.clear()
 			continue
 		else:
 			et.wait()
-			#print('[resbf_flush]',threading.current_thread().name,'1 et set:',et.is_set(),'| ee set:',ee.is_set())
+			print('[resbf_flush]',threading.current_thread().name,'1 et set:',et.is_set(),'| ee set:',ee.is_set())
 			ee.wait()
-			#print('[resbf_flush]',threading.current_thread().name,'2 et set:',et.is_set(),'| ee set:',ee.is_set())
+			print('[resbf_flush]',threading.current_thread().name,'2 et set:',et.is_set(),'| ee set:',ee.is_set())
 			#print('last resbf size ;',resbf.qsize())
 			while not resbf.empty():
 				errline+=1
