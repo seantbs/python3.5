@@ -78,17 +78,15 @@ def eq_get():
 	wqa=None
 	wqb=None
 	#print(threading.current_thread().name,'weqget =',weqget,'ee set',ee.is_set())
-	while eq.empty():
-		if weqget and ee.is_set():
-			print('eq_get]',threading.current_thread().name,'weqget is true ee set',ee.is_set())
-			continue
-		elif weqget and not ee.is_set():
+	while eq.empty() and weqget:
+		if not eq.empty() and weqget:
 			print('[eq_get]',threading.current_thread().name,'eq qsize ;',eq.qsize(),'we set :',we.is_set())
 			break
 		elif not weqget:
 			we.set()
 			wfunc()
 			return
+		print('eq_get]',threading.current_thread().name,'weqget is true ee set',ee.is_set())
 
 	if not eq.empty() and weqget:
 		wqe=eq.get()
