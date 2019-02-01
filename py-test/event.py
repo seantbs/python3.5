@@ -51,8 +51,6 @@ def efunc():
 					eql.append(0)
 					#print('[eq_put]eql :',eql)
 					eq.put(eql)
-					ee.clear()
-					et.set()
 					break
 		else:
 			break
@@ -192,8 +190,10 @@ def resbf_flush(ps):
 			et.clear()
 			continue
 		else:
+			et.clear()
 			et.wait()
 			print('[resbf_flush]',threading.current_thread().name,'1 et set:',et.is_set(),'| ee set:',ee.is_set())
+			ee.clear()
 			ee.wait()
 			print('[resbf_flush]',threading.current_thread().name,'2 et set:',et.is_set(),'| ee set:',ee.is_set())
 			#print('last resbf size ;',resbf.qsize())
