@@ -52,23 +52,22 @@ def efunc():
 					#print('[eq_put]eql :',eql)
 					eq.put(eql)
 					ee.clear()
-					et.clear()
+					et.set()
 					break
 		else:
 			break
 		ee.clear()
 		ee.wait()
 		et.set()
+
 	n=0
 	while True:	
 		while not eq.full():
 			n+=1
-			print('[efunc]n =',n,'eq empty',eq.empty())
+			print('[efunc]n =',n,'eq empty',eq.empty(),'ee set:',ee.is_set())
 			if n <= procs:
 				eq.put(None)
 			elif n > procs:
-				ee.clear()
-				et.set()
 				return
 		ee.clear()
 		ee.wait()
@@ -84,7 +83,6 @@ def eq_get():
 			print('eq_get]',threading.current_thread().name,'weqget is true ee set',ee.is_set())
 			continue
 		elif weqget and not ee.is_set():
-			ee.set()
 			print('[eq_get]',threading.current_thread().name,'eq qsize ;',eq.qsize(),'we set :',we.is_set())
 			break
 		elif not weqget:
@@ -100,21 +98,17 @@ def eq_get():
 			wqa=wqe.pop()
 			wqb=wqe.pop()
 			wg=wq_put_y(wqa,wqb)
-			ee.set()
+			if eq.empty():
+				ee.set()
 			we.set()
 			wq_put()
 		elif wqe == None:
-			if not eq.full():
-				weqget=False
-				print('[eq_get]eq none not full',threading.current_thread().name,'wcq empty',wcq.empty(),'none ee set:',ee.is_set())
-				we.set()
-				wfunc()
-			else:
-				weqget=False
-				print('[eq_get]eq none full',threading.current_thread().name,'wcq empty',wcq.empty(),'none ee set:',ee.is_set())
+			weqget=False
+			print('[eq_get]eq none full',threading.current_thread().name,'weqget is None')
+			if eq.full():
 				ee.set()
-				we.set()
-				wfunc()				
+			we.set()
+			wfunc()
 
 def wq_put():
 	global wg,weqget
@@ -167,30 +161,28 @@ def wfunc():
 		eq_get()
 		return
 	elif not weqget and not wcq.empty():
-		#print('[wfunc]',threading.current_thread().name,'is wait to done...','we set',we.is_set())
 		#we.clear()
 		#we.wait()
-		#print('[wfunc]ee set :',ee.is_set())
 		return
 	#print('[wfunc]',threading.current_thread().name,'wq is empty we set',we.is_set())
 	wq_put()
 
 def resbf_flush(ps):
 	global resbf,reslog,errline,task
-	et.clear()
 	while True:
 		et.wait()
+		et.clear()
 		resbfqs=resbf.qsize()
 		#print('[resbf_flus]task!=0,resbf qsize =',resbfqs)
 		if resbfqs >= ps:
 			thqs=int((resbfqs-resbfqs%ps)/ps)
 		else:
 			thqs=resbfqs
-		print('[resbf_flus]',threading.current_thread().name,'task!=0,thqs =',thqs)
+		#print('[resbf_flus]',threading.current_thread().name,'task!=0,thqs =',thqs)
 		for i in range(thqs):
 			errline+=1
 			try:
-				v=resbf.get_nowait()
+				v=resbf.get()
 			except:
 				break
 			try:
@@ -200,20 +192,16 @@ def resbf_flush(ps):
 				continue
 		reslog.flush()
 		if task != 0:
-			et.clear()
 			continue
 		else:
-			print('[resbf_flush]1 et set:',et.is_set(),'ee set:',ee.is_set())
 			et.wait()
-			print('[resbf_flush]2 et set:',et.is_set(),'ee set:',ee.is_set())
+			#print('[resbf_flush]',threading.current_thread().name,'1 et set:',et.is_set(),'| ee set:',ee.is_set())
 			ee.wait()
-			print('last resbf size ;',resbf.qsize())
+			#print('[resbf_flush]',threading.current_thread().name,'2 et set:',et.is_set(),'| ee set:',ee.is_set())
+			#print('last resbf size ;',resbf.qsize())
 			while not resbf.empty():
 				errline+=1
-				try:
-					v=resbf.get_nowait()
-				except:
-					continue
+				v=resbf.get()
 				try:
 					reslog.write(v)
 				except:
@@ -236,14 +224,14 @@ def wfunc_bar():
 		time.sleep(0.5)
 
 def c_e_th():
-	global procs
+	global ths,procs
 	thp=[]
 	print('event tid',os.getpid(),'is starting...')
 	print('res_save_tid',os.getpid(),'is starting...')
 	pevent=threading.Thread(target=efunc,name='pevent_tid='+str(os.getpid()))
 	pevent.start()
-	for i in range(procs*2):
-		res=threading.Thread(target=resbf_flush,args=(procs*2,),name='res_save_tid='+str(os.getpid())+'/'+str(i))
+	for i in range(int(ths/procs/procs)):
+		res=threading.Thread(target=resbf_flush,args=(int(ths/procs/procs),),name='res_save_tid='+str(os.getpid())+'/'+str(i))
 		thp.append(res)
 	for a in thp:
 		a.start()
@@ -270,8 +258,7 @@ def c_w_th(ths):
 	for b in thp:
 		b.join()
 	print('\n[c_w_th]',os.getpid(),'wq unfinished tasks :',wq.unfinished_tasks)
-	print('main ee set',ee.is_set(),'|resbf qsize:',resbf.qsize())
-	ee.set()
+	print('[c_w_th]ee set',ee.is_set(),'| resbf qsize:',resbf.qsize())
 
 def pefunc():
 	print(os.getpid(),'pefunc is running...')
@@ -287,7 +274,6 @@ def pwfunc():
 	print('\n[pwfunc]pid='+str(os.getpid())+' real time: '+str(ptime)+'s\tcounts:'+str(pcount))
 	print('[pwfunc]'+str(os.getpid())+' wfunc is done use time:%.2f' % (time.time()-st)+'s')
 	print('[pwfunc]wq empty :',wq.empty(),'|wq size :',wq.qsize())
-	#print('[pwfunc]resbf qsize',resbf.qsize())
 
 def delcache():
 	cachedir='__pycache__'
@@ -352,8 +338,10 @@ if __name__=='__main__':
 		pw.apply_async(pwfunc)
 	pw.close()
 	pw.join()
+	ee.set()
+	print('main ee set :',ee.is_set())
 	pe.join()
-	print('resbf size ;',resbf.qsize())
+	print('unfinished resbf size ;',resbf.qsize())
 	reslog.close()
 
 	print('\nreal time: '+str(alltime.value)+'s\tcounts: '+str(allcount.value))
