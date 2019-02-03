@@ -47,19 +47,18 @@ def efunc():
 					eql.append(task)
 					#print('[eq_put]eql :',eql)
 					eq.put(eql)
+					ee.clear()
+					ee.wait()
+					et.set()
 				elif task == 0:
+					et.clear()
 					eql.append(0)
 					#print('[eq_put]eql :',eql)
 					eq.put(eql)
 					break
 		else:
 			break
-		ee.clear()
-		ee.wait()
-		et.set()
-
 	n=0
-	et.clear()
 	while True:	
 		while not eq.full():
 			if n <= procs:
@@ -67,7 +66,7 @@ def efunc():
 				eq.put(None)
 				print('[efunc]n =',n,'eq empty',eq.empty(),'ee set:',ee.is_set())
 			elif n > procs:
-				print('[efunc]',threading.current_thread().name,'1 et set:',et.is_set(),'| ee set:',ee.is_set())
+				print('[efunc]',threading.current_thread().name,'<1> et set:',et.is_set(),'| ee set:',ee.is_set())
 				et.set()
 				return
 		ee.clear()
@@ -131,6 +130,7 @@ def wfunc():
 			text+='a'
 			time.sleep(1)
 		std=str(x)+'\t'+text+'\n'
+		#print('[wfunc]',threading.current_thread().name,'std :',std,'thstatus :',threading.current_thread().isAlive())
 		resbf.put_nowait(std)
 		wq.task_done()
 		ptime+=r
@@ -148,6 +148,7 @@ def wfunc():
 		#we.clear()
 		#we.wait()
 		we.set()
+		print(threading.current_thread().name,threading.current_thread()._tstate_lock)
 		return
 	#print('[wfunc]',threading.current_thread().name,'wq is empty we set',we.is_set())
 	we.wait()
@@ -181,10 +182,10 @@ def resbf_flush(ps):
 			et.clear()
 			continue
 		else:
-			et.wait()
-			print('[resbf_flush]',threading.current_thread().name,'2 et set:',et.is_set(),'| ee set:',ee.is_set())
 			ee.wait()
-			print('[resbf_flush]',threading.current_thread().name,'3 et set:',et.is_set(),'| ee set:',ee.is_set())
+			print('[resbf_flush]',threading.current_thread().name,'<2> et set:',et.is_set(),'| ee set:',ee.is_set())
+			et.wait()
+			print('[resbf_flush]',threading.current_thread().name,'<3> et set:',et.is_set(),'| ee set:',ee.is_set())
 			#print('last resbf size ;',resbf.qsize())
 			while not resbf.empty():
 				errline+=1
@@ -249,7 +250,6 @@ def c_w_th(ths):
 		b.join()
 	print('\n[c_w_th]',os.getpid(),'wq unfinished tasks :',wq.unfinished_tasks)
 	print('[c_w_th]ee set',ee.is_set(),'| resbf qsize:',resbf.qsize())
-	print('[c_w_th]thread set :',threading.current_thread().isAlive())
 	
 def pefunc():
 	print(os.getpid(),'pefunc is running...')
@@ -265,7 +265,8 @@ def pwfunc():
 	print('\n[pwfunc]pid='+str(os.getpid())+' real time: '+str(ptime)+'s\tcounts:'+str(pcount))
 	print('[pwfunc]'+str(os.getpid())+' wfunc is done use time:%.2f' % (time.time()-st)+'s')
 	print('[pwfunc]wq empty :',wq.empty(),'|wq size :',wq.qsize())
-
+	print('[c_w_th]thread set :',threading.current_thread().activeCount())
+	
 def delcache():
 	cachedir='__pycache__'
 	try:
