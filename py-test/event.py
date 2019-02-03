@@ -147,6 +147,7 @@ def wfunc():
 	elif not weqget and not wcq.empty():
 		#we.clear()
 		#we.wait()
+		we.set()
 		return
 	#print('[wfunc]',threading.current_thread().name,'wq is empty we set',we.is_set())
 	we.wait()
