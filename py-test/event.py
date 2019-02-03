@@ -72,23 +72,16 @@ def efunc():
 				return
 		ee.clear()
 		ee.wait()
-
+ 
 def eq_get():
 	global wqs,wg,procs,weqget
 	wqe=[]
 	wqa=None
 	wqb=None
 	#print(threading.current_thread().name,'weqget =',weqget,'ee set',ee.is_set())
-	while eq.empty() and weqget:
-		if not eq.empty() and weqget:
-			print('[eq_get]',threading.current_thread().name,'eq qsize :',eq.qsize(),'ee set :',ee.is_set())
-			break
-		elif not weqget:
-			print('[eq_get]',threading.current_thread().name,'eq qsize :',eq.qsize(),'ee set :',ee.is_set())
-			break
+	if eq.empty() and weqget:
 		print('[eq_get]',threading.current_thread().name,'weqget is',weqget,'| ee set',ee.is_set())
-
-	if not eq.empty() and weqget:
+	elif not eq.empty() and weqget:
 		wqe=eq.get()
 		print('[eq_get]',threading.current_thread().name,'wqe =',wqe,'we set',we.is_set(),'|ee set:',ee.is_set())
 		if wqe != None:
@@ -102,8 +95,8 @@ def eq_get():
 			wq_put()
 			return
 		elif wqe == None:
+			print('[eq_get]eq full :',eq.full(),threading.current_thread().name,'weqget is',weqget)
 			weqget=False
-			print('[eq_get]eq none full',threading.current_thread().name,'weqget is None')
 			if eq.full():
 				ee.set()
 			we.set()
@@ -112,24 +105,19 @@ def eq_get():
 def wq_put():
 	global wg,weqget
 	x=None
-	we.wait()
 	try:
 		x=next(wg)
 	except:
-		if not wcq.empty() and weqget:
-			wcq.get()
-			we.clear()
-			wfunc()
-			return
-		else:
-			wfunc()
-			return
+		if weqget:
+			if not wcq.empty():
+				wcq.get()
+		we.clear()
+		wfunc()
+		return
 	#print('[wq_put]',threading.current_thread().name,'x =',x,'we set',we.is_set())
-	if not wq.full():
+	if not wq.full() and x != None:
 		wq.put(x)
-		wfunc()
-	else:
-		wfunc()
+	wfunc()
 
 def wfunc():
 	global ptime,pcount,resbf,threadover,weqget
@@ -153,17 +141,15 @@ def wfunc():
 		try:
 			wcq.put_nowait(threading.current_thread().name)
 		except:
-			we.clear()
 			wq_put()
 		#print('[wfunc]',threading.current_thread().name,'wcq empty',wcq.empty(),'we set',we.is_set())
-		we.clear()
 		eq_get()
-		return
 	elif not weqget and not wcq.empty():
 		#we.clear()
 		#we.wait()
 		return
 	#print('[wfunc]',threading.current_thread().name,'wq is empty we set',we.is_set())
+	we.wait()
 	wq_put()
 
 def resbf_flush(ps):
@@ -262,6 +248,7 @@ def c_w_th(ths):
 		b.join()
 	print('\n[c_w_th]',os.getpid(),'wq unfinished tasks :',wq.unfinished_tasks)
 	print('[c_w_th]ee set',ee.is_set(),'| resbf qsize:',resbf.qsize())
+	print('[c_w_th]thread set :',threading.current_thread().isAlive())
 	
 def pefunc():
 	print(os.getpid(),'pefunc is running...')
