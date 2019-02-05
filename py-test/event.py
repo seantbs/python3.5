@@ -6,7 +6,7 @@ import io,os,sys,time,random,threading,queue,pgbar
 
 def eq_put_y(a,b,c):
 	if a == 0:
-		return
+		yield 0
 	if c == 1:
 		for i in range(c):
 			if a >= b:
@@ -33,41 +33,40 @@ def wq_put_y(a,b):
 		yield i+1
 
 def efunc():
-	global task,wqs,procs
+	global task,wqs,procs,taskend
 	print('[efunc]event tid',os.getpid(),'is running...')
 	while True:
 		if task != 0:
 			while not eq.full():
-				eg=eq_put_y(task,wqs,procs)
-				eql=[]
-				#print('[eq_put]task =',task)
-				eql.append(task)
-				task=next(eg)
 				if task != 0:
+					eg=eq_put_y(task,wqs,procs)
+					eql=[]
+					#print('[eq_put]task =',task)
+					eql.append(task)
+					task=next(eg)
 					eql.append(task)
 					#print('[eq_put]eql :',eql)
 					eq.put(eql)
-					ee.clear()
-					ee.wait()
-					et.set()
-				elif task == 0:
-					et.clear()
-					eql.append(0)
-					#print('[eq_put]eql :',eql)
-					eq.put(eql)
+				else:
 					break
-		else:
+		elif task == 0:
 			break
+		ee.clear()
+		ee.wait()
+		et.set()
+	print('[efunc]task =',task,'et set',et.is_set(),'| ee set',ee.is_set())
 	n=0
 	while True:	
 		while not eq.full():
+			n+=1
 			if n <= procs:
-				n+=1
 				eq.put(None)
 				print('[efunc]n =',n,'eq empty',eq.empty(),'ee set:',ee.is_set())
 			elif n > procs:
 				print('[efunc]',threading.current_thread().name,'<1> et set:',et.is_set(),'| ee set:',ee.is_set())
 				et.set()
+				ee.clear()
+				taskend=True
 				return
 		ee.clear()
 		ee.wait()
@@ -79,10 +78,11 @@ def eq_get():
 	wqb=None
 	#print(threading.current_thread().name,'weqget =',weqget,'ee set',ee.is_set())
 	if eq.empty() and weqget:
-		print('[eq_get]',threading.current_thread().name,'weqget is',weqget,'| ee set',ee.is_set())
+		print('[eq_get]',threading.current_thread().name,'weqget is',weqget,'| we set',we.is_set(),'| ee set',ee.is_set())
+		we.set()
 	elif not eq.empty() and weqget:
 		wqe=eq.get()
-		print('[eq_get]',threading.current_thread().name,'wqe =',wqe,'we set',we.is_set(),'|ee set:',ee.is_set())
+		print('[eq_get]',threading.current_thread().name,'wqe=',wqe,'| eq empty :',eq.empty(),'| we set',we.is_set(),'| ee set:',ee.is_set())
 		if wqe != None:
 			#print('[eq_get]wqe =',wqe)
 			wqa=wqe.pop()
@@ -94,11 +94,11 @@ def eq_get():
 			wq_put()
 			return
 		elif wqe == None:
-			print('[eq_get]eq full :',eq.full(),threading.current_thread().name,'weqget is',weqget)
 			weqget=False
-			if eq.full():
-				ee.set()
+			ee.set()
+			print('[eq_get]eq empty :',eq.empty(),threading.current_thread().name,'weqget is',weqget)
 			we.set()
+	print('[eq_get]',threading.current_thread().name,'return to wfunc','we set :',we.is_set(),'ee set :',ee.is_set(),'| eq empty :',eq.empty(),'wcq empty :',wcq.empty(),'weqget :',weqget)
 	wfunc()
 
 def wq_put():
@@ -111,6 +111,7 @@ def wq_put():
 			if not wcq.empty():
 				wcq.get()
 		we.clear()
+		print('[wq_put]return to wfunc','wcq empty :',wcq.empty(),'we set',we.is_set())
 		wfunc()
 		return
 	#print('[wq_put]',threading.current_thread().name,'x =',x,'we set',we.is_set())
@@ -143,19 +144,20 @@ def wfunc():
 		except:
 			wq_put()
 		#print('[wfunc]',threading.current_thread().name,'wcq empty',wcq.empty(),'we set',we.is_set())
+		we.clear()
 		eq_get()
 	elif not weqget and not wcq.empty():
 		#we.clear()
 		#we.wait()
 		we.set()
-		print(threading.current_thread().name,threading.current_thread()._tstate_lock)
+		#print('[wfunc]',threading.current_thread().name,threading.current_thread()._tstate_lock)
 		return
 	#print('[wfunc]',threading.current_thread().name,'wq is empty we set',we.is_set())
 	we.wait()
 	wq_put()
 
 def resbf_flush(ps):
-	global resbf,reslog,errline,task
+	global resbf,reslog,errline,task,taskend
 	et.clear()
 	while True:
 		et.wait()
@@ -178,13 +180,13 @@ def resbf_flush(ps):
 				print('reslog write erroe at line:',errline,v)
 				continue
 		reslog.flush()
-		if task != 0:
+		print('[resbf_flush]et set:',et.is_set(),'taskend =',taskend)
+		if taskend == False:
 			et.clear()
-			continue
-		else:
-			ee.wait()
-			print('[resbf_flush]',threading.current_thread().name,'<2> et set:',et.is_set(),'| ee set:',ee.is_set())
+		elif taskend == True:
 			et.wait()
+			print('[resbf_flush]',threading.current_thread().name,'<2> et set:',et.is_set(),'| ee set:',ee.is_set())
+			ee.wait()
 			print('[resbf_flush]',threading.current_thread().name,'<3> et set:',et.is_set(),'| ee set:',ee.is_set())
 			#print('last resbf size ;',resbf.qsize())
 			while not resbf.empty():
@@ -199,7 +201,7 @@ def resbf_flush(ps):
 					print('reslog write erroe at line:',errline,v)
 					continue
 			reslog.flush()
-			return
+			break
 
 def wfunc_bar():
 	global bartask,st
@@ -222,8 +224,8 @@ def c_e_th():
 	pevent=threading.Thread(target=efunc,name='pevent_tid='+str(os.getpid()))
 	pevent.start()
 	for i in range(procs*2):
-		res=threading.Thread(target=resbf_flush,args=(procs*2,),name='res_save_tid='+str(os.getpid())+'/'+str(i))
-		thp.append(res)
+		rbf=threading.Thread(target=resbf_flush,args=(procs*2,),name='res_save_tid='+str(os.getpid())+'/'+str(i))
+		thp.append(rbf)
 	for a in thp:
 		a.start()
 	pevent.join()
@@ -311,9 +313,10 @@ if __name__=='__main__':
 #set var to event procs
 	ee=Event()
 	et=threading.Event()
+	taskend=False
 	pe=Process(target=pefunc)
 	pe.start()
-	del et
+	del et,taskend,bartask
 
 #set var to work procs
 	wq=queue.Queue(wqs)
