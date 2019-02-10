@@ -1,4 +1,4 @@
-#!/usr/bin/python3.5
+#!/usr/bin/python
 # -*- coding: utf-8 -*-
 
 from multiprocessing import Event,JoinableQueue,Pool,Process,Value
@@ -152,7 +152,7 @@ def wq_put():
 				except:
 					pass
 			we.clear()
-			print('[wq_put]',threading.current_thread().name,'return to wfunc 1 ','wcq empty :',wcq.empty(),'| eq empty :',eq.empty(),'weqget =',weqget,'we set',we.is_set(),'| wq empty:',wq.empty(),'y=',y)
+			print('[wq_put]',threading.current_thread().name,'return to wfunc 1 ','wcq empty :',wcq.empty(),'| eq empty :',eq.empty(),'weqget =',weqget,'we set',we.is_set(),'| wq empty:',wq.empty())
 			wfunc()
 			return
 	else:
@@ -213,6 +213,7 @@ def wfunc():
 			res_save()
 		return
 	#print('[wfunc]check 1 :',threading.current_thread().name)
+	we.wait()
 	wq_put()
 	return
 
