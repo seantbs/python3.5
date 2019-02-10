@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 
 from multiprocessing import Event,JoinableQueue,Pool,Process,Value
-import io,os,sys,time,random,threading,queue,pgbar
+import io,os,sys,time,random,threading,queue,pgbar,gc
 
 def eq_put_y(a,b,c):
 	if a == 0:
@@ -62,17 +62,35 @@ def efunc():
 				print('[efunc]n =',n,'eq empty',eq.empty(),'ee set:',ee.is_set())
 			elif n > procs and eq.empty():
 				ee.clear()
+				taskend.value=True
 				print('[efunc]',threading.current_thread().name,'<1> ee set:',ee.is_set())
 				return
 		ee.clear()
 		ee.wait()
+	return
  
 def eq_get():
 	global wqs,wg,procs,weqget,task
 	wqe=[]
 	wqa=None
 	wqb=None
+	x=None
 	#print(threading.current_thread().name,'weqget =',weqget,'ee set',ee.is_set())
+	while True:
+		time.sleep(0.001)
+		try:
+			x=next(wg)
+		except:
+			break
+		#print('[eq_get]',threading.current_thread().name,'wcq empty:',wcq.empty(),'we set:',we.is_set(),'x=',x)
+		if not wq.full() and x != None:
+			try:
+				wq.put_nowait(x)
+			except:
+				pass
+		if not we.is_set() and not wcq.empty():
+			we.set()
+
 	if weqget:
 		ee.set()
 		while eq.empty():
@@ -81,10 +99,11 @@ def eq_get():
 				we.set()
 				wfunc()
 				return
-			elif eq.empty() and not ee.is_set():
+			elif eq.empty() and taskend.value == True:
 				weqget=False
 				we.set()
 				break
+			time.sleep(0.001)
 	else:
 		wfunc()
 		return
@@ -100,6 +119,7 @@ def eq_get():
 					return
 				else:
 					ee.set()
+					time.sleep(0.001)
 					continue
 			break
 		eq.task_done()
@@ -109,30 +129,34 @@ def eq_get():
 			wqb=wqe.pop()
 			wg=wq_put_y(wqa,wqb)
 			ee.set()
+			we.set()
 			wq_put()
 		elif wqe == 'done':
 			weqget=False
 	#print('[eq_get]',threading.current_thread().name,'return to wfunc','we set :',we.is_set(),'ee set :',ee.is_set(),'| eq empty :',eq.empty(),'wcq empty :',wcq.empty(),'weqget :',weqget)
 	we.set()
 	wfunc()
+	return
 
 def wq_put():
 	global wg,weqget
 	x=None
-	if not we.is_set() and not wcq.empty():
-		we.set()
+	we.wait()
 	if weqget:
 		try:
 			x=next(wg)
 		except:
 			if not wcq.empty():
-				wcq.get_nowait()
-				we.clear()
-			print('[wq_put]',threading.current_thread().name,'return to wfunc','wcq empty :',wcq.empty(),'| eq empty :',eq.empty(),'weqget =',weqget,'we set',we.is_set())
+				try:
+					y=wcq.get_nowait()
+				except:
+					pass
+			we.clear()
+			print('[wq_put]',threading.current_thread().name,'return to wfunc 1 ','wcq empty :',wcq.empty(),'| eq empty :',eq.empty(),'weqget =',weqget,'we set',we.is_set(),'| wq empty:',wq.empty(),'y=',y)
 			wfunc()
 			return
 	else:
-		print('[wq_put]',threading.current_thread().name,'return to wfunc','wcq empty :',wcq.empty(),'| eq empty :',eq.empty(),'weqget =',weqget,'we set',we.is_set())
+		print('[wq_put]',threading.current_thread().name,'return to wfunc 2 ','wcq empty :',wcq.empty(),'| eq empty :',eq.empty(),'weqget =',weqget,'we set',we.is_set())
 		wfunc()
 		return
 	#print('[wq_put]',threading.current_thread().name,'x =',x,'we set',we.is_set())
@@ -143,17 +167,18 @@ def wq_put():
 			pass
 	#print('[wq_put]check 2 :',threading.current_thread().name)
 	wfunc()
+	return
 
 def wfunc():
 	global ptime,pcount,resbf,threadover,weqget,errlist
 	x=None
-	n=0
+	std=None
+	text=''
 	while not wq.empty():
 		try:
 			x=wq.get_nowait()
 		except:
 			break
-		text=''
 		#print('[wfunc]',threading.current_thread().name,'x =',x)
 		r=random.randint(2,6)
 		for i in range(r):
@@ -161,15 +186,12 @@ def wfunc():
 			time.sleep(1)
 		std=str(x)+'\t'+text+'\n'
 		#print('[wfunc]',threading.current_thread().name,'std :',std)
+		res_cache.append(std)
 		wq.task_done()
 		ptime+=r
 		pcount+=1
-		n+=1
-		try:
-			reslog.write(std)
-		except:
-			errlist.append(std)
-		reslog.flush()
+	if pcount%(wths) < wths/100:
+		res_save()
 
 	if wcq.empty():
 		try:
@@ -187,10 +209,27 @@ def wfunc():
 			ee.clear()
 		elif not we.is_set():
 			we.set()
+		while len(res_cache):
+			res_save()
 		return
-	we.wait()
 	#print('[wfunc]check 1 :',threading.current_thread().name)
 	wq_put()
+	return
+
+def res_save():
+	global wths,res_cache
+	v=''
+	for i in range(wths):
+		try:
+			v+=res_cache.pop()
+		except:
+			continue
+	try:
+		reslog.write(v)
+	except:
+		errlist.append(v)
+	reslog.flush()
+	return
 
 def wfunc_bar():
 	global bartask,st
@@ -204,7 +243,8 @@ def wfunc_bar():
 			break
 		#print('count =',count)
 		time.sleep(0.5)
-
+	return
+	
 def c_e_th():
 	global wths,procs
 	thp=[]
@@ -217,6 +257,7 @@ def c_e_th():
 	#wbar=threading.Thread(target=wfunc_bar,name='wbar_tid='+str(os.getpid()))
 	#wbar.start()
 	#wbar.join()
+	return
 
 def c_w_th(ths):
 	thp=[]
@@ -228,11 +269,13 @@ def c_w_th(ths):
 	for b in thp:
 		b.join()
 	print('\n[c_w_th]',os.getpid(),'wq unfinished tasks :',wq.unfinished_tasks)
+	return
 
 def pefunc():
 	print(os.getpid(),'pefunc is starting......')
 	c_e_th()
 	print('[pefunc]pefunc done......')
+	return
 
 def pwfunc():
 	global allcount,alltime
@@ -262,15 +305,18 @@ def delcache():
 			os.rmdir('../'+cachedir)
 			os.chdir('../')
 			return
+	return
 def cb_w_p_fin(test):
 	global p_fin_c,procs
 	p_fin_c.append(test)
 	print('[cb_w_p_fin]',p_fin_c)
 	if len(p_fin_c) == procs:
 		pw.terminate()
+	return
 
 if __name__=='__main__':
 	st=time.time()
+	delcache()
 #public var set
 	procs=int(input('set procs:'))-1
 	if procs <= 1:
@@ -281,12 +327,19 @@ if __name__=='__main__':
 	eq=JoinableQueue(procs)
 	task=int(input('set task count:'))
 	bartask=task
+	taskend=Value('b',False)
 	alltime=Value('i',0)
 	allcount=Value('i',0)
 	bar=Value('i',1)
-
+	
+#set var to event procs
+	ee=Event()
+	pe=Process(target=pefunc)
+	pe.start()
+	del bartask
+	gc.collect()
+	
 #log file set
-	delcache()
 	fname='./result.log'
 	try:
 		os.remove(fname)
@@ -294,12 +347,6 @@ if __name__=='__main__':
 		pass
 	os.path.exists(fname)
 	reslog=open(fname,'a')
-
-#set var to event procs
-	ee=Event()
-	pe=Process(target=pefunc)
-	pe.start()
-	del bartask
 
 #set var to work procs
 	wq=queue.Queue(wqs)
@@ -309,6 +356,7 @@ if __name__=='__main__':
 	wg=None
 	ptime=0
 	pcount=0
+	res_cache=[]
 	errlist=[]
 	p_fin_c=[]
 	pw=Pool(procs)
