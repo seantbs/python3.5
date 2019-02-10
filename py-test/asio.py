@@ -21,43 +21,12 @@ def produce(c):
 		print('[PRODUCER] Consumer return: %s' % r)
 	c.close()'''
 
-async def compute(x, y):
-	print("Compute %s + %s ..." % (x, y))
-	await asyncio.sleep(1.0)
-	return x + y
-
-async def print_sum(x, y):
-	result = await compute(x, y)
-	print("%s + %s = %s" % (x, y, result))
-
 ###########################################################
-'''async def wq_put():
-	global i,st
-	while True:
-		i+=1
-		print('[wq_put]i =',i,'<->',time.time()-st)
-		wq.put(i)
+async def work(n):
+	for i in range(3):
+		print('work',n,'...',i+1)
 		await asyncio.sleep(1)
-		if i < 5:
-			continue
-		else:
-			return
-
-async def wq_get():
-	global text
-	print('wq get is starting...')
-	while not wq.empty():
-		text=''
-		try:
-			x=str(wq.get())
-		except:
-			await wq_put()
-		print('[wq_get]x =',x)
-		r=random.randint(2,8)
-		for i in range(r):
-			text+='a'
-			await asyncio.sleep(1)
-		print('[wq_get]text : '+x+','+text)'''
+	return
 
 if __name__ == '__main__':
 	st=time.time()
@@ -69,9 +38,13 @@ if __name__ == '__main__':
 	#coroutine test
 	c = consumer()
 	produce(c)'''
-	
+	wq=queue.Queue()
+	for i in range(100):
+		wq.put(i+1)
+	y=0
 	loop = asyncio.get_event_loop()
-	loop.run_until_complete(print_sum(1, 2))
+	astks=[work(i) for i in range(3)]
+	loop.run_until_complete(asyncio.wait(astks))
 	loop.close()
 
 	'''loop = asyncio.get_event_loop()
