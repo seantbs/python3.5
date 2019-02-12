@@ -1,8 +1,7 @@
-#!/usr/bin/python3.5
+#!/usr/bin/python3
 
 import os,io,sys,queue,threading,time,random
-
-stime=time.time()
+from memory_profiler import profile
 
 def y(s,e):
 	global a
@@ -13,6 +12,7 @@ def y(s,e):
 			yield i
 	else:
 		pg_put()
+
 def pq_put():
 	global pq,a,b
 	for i in range(a,b):
@@ -23,18 +23,27 @@ def pq_put():
 			break
 		#print("pq func a =",a)
 
+#@profile(precision=4)
 def pq_get():
-	global pq,a
+	global pq,a,tcount,wcount
 	#print("pq_get func a =",a)
 	while not pq.empty():
 		print(threading.current_thread().name,"is running code =\t",pq.get())
-		time.sleep(random.randint(1,2))
+		rtime=random.randint(2,6)
+		time.sleep(rtime)
+		tcount+=rtime
+		wcount+=1
 	pq_put()
 
 if __name__=='__main__':
+	st=time.time()
 	a=1
-	b=1001
-	ths=100
+	ths=int(input('set thread count:'))
+	b=int(input('set task count:'))
+	b+=1
+	tcount=0
+	wcount=0
+	
 	pq=queue.Queue(ths)
 	
 	thp=[]
@@ -46,4 +55,5 @@ if __name__=='__main__':
 	for d in thp:
 		d.join()
 
-	print("real time:",time.time()-stime)
+	print('\nreal time: '+str(tcount)+'s\tcounts: '+str(wcount))
+	print('use time: %.2f' % (time.time()-st)+'s')
