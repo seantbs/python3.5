@@ -1,7 +1,7 @@
 #!/usr/bin/python3
 
 import os,io,sys,queue,threading,time,random
-from memory_profiler import profile
+#from memory_profiler import profile
 
 def y(s,e):
 	global a
