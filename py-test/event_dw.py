@@ -3,7 +3,7 @@
 
 from multiprocessing import Event,JoinableQueue,Pool,Process,Value
 import io,os,sys,time,random,threading,queue
-import pgbar
+import pgbar,tracemalloc
 
 def eq_put_y(a,b,c):
 	if a == 0:
@@ -128,8 +128,8 @@ def eq_get():
 						ee.set()
 						time.sleep(0.1)
 						continue
+			eq.task_done()
 			break
-		eq.task_done()
 		print('<%.4f s>' % (time.time()-st),'| [eq_get]',threading.current_thread().name,'wqe=',wqe,'| eq empty :',eq.empty(),'| we set',we.is_set(),'| ee set:',ee.is_set(),'| wcq empty :',wcq.empty(),)
 		if wqe != 'done' and wqe != []:
 			wqa=wqe.pop()
@@ -146,7 +146,7 @@ def eq_get():
 	return
 
 def wq_put():
-	global wg,weqget,wq
+	global wg,weqget,wq,wq_cache
 	while True:
 		x=None
 		while len(wq_cache):
@@ -170,7 +170,7 @@ def wq_put():
 						y=wcq.get_nowait()
 					except:
 						pass
-				print('[wfunc]return to wfunc()',threading.current_thread().name,'wcq empty',wcq.empty(),'we set',we.is_set(),'weqget =',weqget)
+				#print('[wq_put]return to wfunc()',threading.current_thread().name,'wcq empty',wcq.empty(),'we set',we.is_set(),'weqget =',weqget)
 				wfunc()
 				return
 			if not wq.full() and x != None:
@@ -178,15 +178,16 @@ def wq_put():
 					wq.put_nowait(x)
 				except:
 					wq_cache.append(x)
-			else:
+			elif wq.full() and x != None:
+				wq_cache.append(x)
 				time.sleep(0.1)
 		else:
-			print('[wq_put]',threading.current_thread().name,'return to wfunc 2 ','wcq empty :',wcq.empty(),'| eq empty :',eq.empty(),'weqget =',weqget,'we set',we.is_set())
+			#print('[wq_put]',threading.current_thread().name,'return to wfunc 2 ','wcq empty :',wcq.empty(),'| eq empty :',eq.empty(),'weqget =',weqget,'we set',we.is_set())
 			wfunc()
 			return
 
 def wfunc():
-	global ptime,pcount,resbf,threadover,weqget,errlist
+	global ptime,pcount,resbf,weqget,errlist
 	while not wq.empty():
 		x=None
 		std=''
@@ -212,7 +213,7 @@ def wfunc():
 		pcount+=1
 		if pcount%(wths) < wths/100:
 			res_save()
-			
+
 	if wcq.empty():
 		try:
 			wcq.put_nowait(threading.current_thread().name)
@@ -242,7 +243,7 @@ def wfunc():
 				continue
 			reslog.write(v)
 		return
-	print('[wfunc]',threading.current_thread().name,'return to wq_put wcq empty:',wcq.empty(),'| wq empty :',wq.empty(),'weqget =',weqget,'we set',we.is_set())
+	#print('[wfunc]',threading.current_thread().name,'return to wq_put wcq empty:',wcq.empty(),'| wq empty :',wq.empty(),'weqget =',weqget,'we set',we.is_set())
 	we.wait()
 	wq_put()
 	return
@@ -275,7 +276,7 @@ def wfunc_bar():
 		#print('count =',count)
 		time.sleep(0.5)
 	return
-	
+
 def c_e_th():
 	global wths,procs
 	thp=[]
@@ -314,6 +315,7 @@ def pwfunc():
 	c_w_th(wths)
 	allcount.value+=pcount
 	alltime.value+=ptime
+	print('tracemalloc:',tracemalloc.get_traced_memory())
 	print('\n[pwfunc]pid='+str(os.getpid())+' real time: '+str(ptime)+'s\tcounts:'+str(pcount))
 	print('[pwfunc]'+str(os.getpid())+' wfunc is done use time:%.2f' % (time.time()-st)+'s')
 	print('[pwfunc]wq empty :',wq.empty(),'|wq size :',wq.qsize(),'| errlist count :',len(errlist))
@@ -337,6 +339,7 @@ def delcache():
 			os.chdir('../')
 			return
 	return
+
 def cb_w_p_fin(test):
 	global p_fin_c,procs
 	p_fin_c.append(test)
@@ -344,15 +347,9 @@ def cb_w_p_fin(test):
 	if len(p_fin_c) == procs:
 		pw.terminate()
 	return
-
-def main():
-	for i in range(procs):
-		pw.apply_async(pwfunc,callback=cb_w_p_fin)
-	pw.close()
-	pw.join()
-	print('pw is over......')
 	
 if __name__=='__main__':
+	tracemalloc.start()
 	st=time.time()
 	delcache()
 #public var set
@@ -398,9 +395,14 @@ if __name__=='__main__':
 	errlist=[]
 	p_fin_c=[]
 	pw=Pool(procs)
-	main()
+	for _ in range(procs):
+		pw.apply_async(pwfunc,callback=cb_w_p_fin)
+	#del wq,wg,ptime,pcount,wq_cache,res_cache,errlist
+	pw.close()
+	pw.join()
+	print('pw is over......')
 	pe.join()
 	reslog.close()
-
+	
 	print('\nreal time: '+str(alltime.value)+'s\tcounts: '+str(allcount.value))
 	print('use time: %.2f' % (time.time()-st)+'s')
