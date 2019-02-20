@@ -149,7 +149,7 @@ def wq_put():
 	while True:
 		x=None
 		while len(wq_cache):
-			print('[wq_put]wq_cache len:',len(wq_cache))
+			#print('[wq_put]wq_cache len:',len(wq_cache))
 			try:
 				x=wq_cache.pop()
 			except:
@@ -168,7 +168,7 @@ def wq_put():
 			try:
 				x=next(wg)
 			except:
-				if not wcq.empty():
+				if not wcq.empty() and wq.empty():
 					try:
 						y=wcq.get()
 					except:
@@ -178,10 +178,10 @@ def wq_put():
 					print('[wq_put]return to wfunc()',threading.current_thread().name,'wcq empty',wcq.empty(),'we set',we.is_set(),'weqget =',weqget)
 					wfunc()
 					return
-				print('[wq_put]return to wq_get()',threading.current_thread().name,'wcq empty',wcq.empty(),'we set',we.is_set(),'weqget =',weqget)
+				#print('[wq_put]return to wq_get()',threading.current_thread().name,'wcq empty',wcq.empty(),'we set',we.is_set(),'weqget =',weqget)
 				wq_get()
 				return
-			print('[wq_put]',threading.current_thread().name,'wq full:',wq.full(),'|x=',x)
+			#print('[wq_put]',threading.current_thread().name,'wq full:',wq.full(),'|x=',x)
 			if not wq.full() and x != None:
 				try:
 					wq.put_nowait(x)
@@ -226,6 +226,7 @@ def wq_get():
 		pcount+=1
 		if pcount%(wths) < wths/100:
 			res_save()
+	we.wait()
 	wq_put()
 	return
 
@@ -235,7 +236,6 @@ def wfunc():
 		try:
 			wcq.put_nowait(threading.current_thread().name)
 		except:
-			we.wait()
 			wq_get()
 			return
 		we.clear()
@@ -265,7 +265,7 @@ def wfunc():
 		return
 	#print('[wfunc]',threading.current_thread().name,'return to wq_put wcq empty:',wcq.empty(),'| wq empty :',wq.empty(),'weqget =',weqget,'we set',we.is_set())
 	we.wait()
-	wq_put()
+	wq_get()
 	return
 
 def res_save():
@@ -403,7 +403,7 @@ if __name__=='__main__':
 	reslog=open(fname,'a')
 
 #set var to work procs
-	wq=queue.Queue(int(wths))
+	wq=queue.Queue(int(wths*procs))
 	wcq=queue.Queue(1)
 	we=threading.Event()
 	weqget=True
