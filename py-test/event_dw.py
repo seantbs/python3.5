@@ -403,7 +403,7 @@ if __name__=='__main__':
 	reslog=open(fname,'a')
 
 #set var to work procs
-	wq=queue.Queue(int(wths*2))
+	wq=queue.Queue(int(wths*procs))
 	wcq=queue.Queue(1)
 	we=threading.Event()
 	weqget=True
