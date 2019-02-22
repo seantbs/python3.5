@@ -59,11 +59,12 @@ if __name__ == '__main__':
 	wq=asyncio.Queue()
 	y=0
 	asyncio.run(main())
+	print(wq.qsize())
 	#loop = asyncio.get_event_loop()
 	#astks=asyncio.create_task(work(i+1) for i in range(3))
 	#loop.run_until_complete(asyncio.wait(astks))
 	#loop.close()
-
+	
 	'''loop = asyncio.get_event_loop()
 	astks = [wq_get(),wq_put()]
 	loop.run_until_complete(asyncio.wait(astks))
