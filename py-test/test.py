@@ -15,8 +15,7 @@ async def wait_time(t):
 def got_result(future):
     print(future.result())
     loop.stop()
-####################################################
-
+####################################################################
 #test loop
 async def work():
 	global ct,cw,res_cache,workers
@@ -58,6 +57,43 @@ async def res_save():
 	reslog.flush()
 	return
 
+def wq_put_y(a):
+	for i in range(a):
+		yield i+1
+
+def workers_y(a):
+	for i in range(a)
+		yield work()
+
+def wq_put():
+	global wq_g
+	while True:
+		try:
+			x = next(wq_g)
+		except:
+			coro_tasks()
+		wq.put(x)
+
+def coro_tasks():
+	global coros,workers_g
+	while True:
+		try:
+			x = next(workers_g)
+		except:
+			return
+		coros.append(x)
+
+def run_threads(ths):
+	thp=[]
+	for i in range(ths):
+		t=threading.Thread(target=wq_put,name='tid'+str(os.getpid())+r'/'+str(i))
+		thp.append(t)
+	for a in thp:
+		a.start()
+	for b in thp:
+		b.join()
+	print('[run_threads]wq is ready...')
+
 if __name__=='__main__':
 	st=time.time()
 	
@@ -72,17 +108,17 @@ if __name__=='__main__':
 	ct=0
 	cw=0
 	res_cache=[]
-	workers=20000
-	counts=6600000
-	
+	workers=10450
+	counts=66000
+	ths=1500
+	coros=[]
+	workers_g=worker_y(worker)
+	wq_g=wq_put_y(counts)
 	wq=queue.Queue()
-	for i in range(counts):
-		wq.put(i+1)
+	
+	run_threads(ths)
 	
 	loop = asyncio.get_event_loop()
-	coros=[]
-	for i in range(workers):
-		coros.append(work())
 	fs=asyncio.gather(*coros)
 	loop.run_until_complete(fs)
 	loop.close()
@@ -91,3 +127,4 @@ if __name__=='__main__':
 	
 	print('real time : %s\tcounts : %s' % (ct,cw))
 	print('use time:%.4f'%(time.time()-st))
+	
