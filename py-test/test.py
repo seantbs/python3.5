@@ -16,39 +16,44 @@ def got_result(future):
     print(future.result())
     loop.stop()
 ####################################################################
+####################################################################
+
 #test loop
 async def work():
-	global ct,cw,res_cache,workers,works
+	global cw,workers,works,count
 	while True:
 		std = ''
 		text = ''
 		x = None
-		r = random.randint(2,6)
 		if not wq.empty():
 			x = wq.get()
-			ct+=r
 			cw+=1
 			if cw%1000 == 0:
 				pgbar.bar(works,cw,50,st)
 			elif cw == works:
 				pgbar.bar(works,cw,50,st)
-			#print('[work_%s]work %s is running...' % (x,x))
-			for i in range(r):
-				text+='a'
-				await asyncio.sleep(1)
-			std=str(x)+'\t'+text+'\n'
-			#print('[work_%s]x = %s,r = %s,std = %s' % (x,x,r,std))
-			res_cache.append(std)
-			if cw%1000 == 0:
-				pgbar.bar(works,cw,50,st)
-			elif cw == works:
-				pgbar.bar(works,cw,50,st)
-			if cw%(workers) < workers/100:
+				print('\n[work]work queue is empty...')
+		if x != None:
+			await slow_work(std,text,x)
+			if count%(workers) < workers/100:
 				await res_save()
-		else:
+		elif x == None:
 			while len(res_cache):
 				await res_save()
 			return
+
+async def slow_work(std,text,x):
+	global count,res_cache,ct,cw
+	r = random.randint(2,6)
+	ct+=r
+	for i in range(r):
+		text+='a'
+		await asyncio.sleep(1)
+	std=str(x)+'\t'+text+'\n'
+	#print('[slow_work]x = %s,r = %s,std = %s' % (x,r,std))
+	res_cache.append(std)
+	count+=1
+	sys.stdout.write('\rcount = '+str(count)+'\t|cw = '+str(cw))
 
 async def res_save():
 	global workers,res_cache
@@ -74,7 +79,7 @@ def workers_y(a):
 		yield work()
 
 def prepare(workers,counts):
-	print('[prepare]prepare workers...')
+	print('[prepare]prepare %d workers...'%workers)
 	count=0
 	coros=[]
 	workers_g=workers_y(workers)
@@ -91,7 +96,7 @@ def prepare(workers,counts):
 			pgbar.bar(workers,count,50,st)
 	print('\n[prepare]workers is ready')
 	
-	print('[prepare]prepare wq...')
+	print('[prepare]prepare work queue...')
 	count=0
 	wq_g=wq_put_y(works)
 	while True:
@@ -108,12 +113,6 @@ def prepare(workers,counts):
 	print('\n[prepare]wq is ready')
 	return coros
 
-def run_threads(workers,counts):
-	t1=threading.Thread(target=prepare,args=(workers,works),name='tid'+str(os.getpid())+'t1')
-	t1.start()
-	t1.join()
-	print('[run_threads]wq is ready...')
-
 if __name__=='__main__':
 	st=time.time()
 	
@@ -127,19 +126,20 @@ if __name__=='__main__':
 	
 	ct=0
 	cw=0
+	count=0
 	res_cache=[]
-	workers=10000
-	works=65536
+	workers=60000
+	works=655360
 	wq=queue.Queue()
 	coros = prepare(workers,works)
 
-	print('working....')
+	print('[main]works is starting....')
 	loop = asyncio.get_event_loop()
 	fs=asyncio.gather(*coros)
 	loop.run_until_complete(fs)
 	loop.close()
 	reslog.close()
-	print('\nno work to do...',wq.qsize())
+	print('\nall works done')
 	
 	print('real time : %s\tcounts : %s' % (ct,cw))
 	print('use time:%.4f'%(time.time()-st))
