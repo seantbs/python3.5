@@ -84,28 +84,12 @@ def eq_get():
 	wqe=[]
 	wqa=None
 	wqb=None
-	x=None
-	#print(threading.current_thread().name,'weqget =',weqget,'ee set',ee.is_set())
-	while True:
-		try:
-			x=next(wg)
-		except:
-			break
-		#print('[eq_get]',threading.current_thread().name,'wcq empty:',wcq.empty(),'we set:',we.is_set(),'x=',x)
-		if not wq.full() and x != None:
-			try:
-				wq.put_nowait(x)
-			except:
-				pass
-		if not we.is_set() and not wcq.empty():
-			we.set()
 
 	if weqget:
 		ee.set()
 		while eq.empty():
 			print('[eq_get]',threading.current_thread().name,'wcq empty :',wcq.empty(),'weqget is',weqget,'| ee set:',ee.is_set(),'| we set',we.is_set(),'| eq qsize:',eq.qsize())
 			if not weqget:
-				we.set()
 				wq_put()
 				return
 			elif eq.empty() and taskend.value == True:
@@ -138,141 +122,61 @@ def eq_get():
 			wqb=wqe.pop()
 			wg=wq_put_y(wqa,wqb)
 			ee.set()
-			we.set()
 			wq_put()
 			return
 		elif wqe == 'done':
 			weqget=False
-	#print('[eq_get]',threading.current_thread().name,'return to wfunc','we set :',we.is_set(),'ee set :',ee.is_set(),'| eq empty :',eq.empty(),'wcq empty :',wcq.empty(),'weqget :',weqget)
-	we.set()
-	wq_put()
-	return
 
 def wq_put():
-	global wg,weqget,wq,wq_cache
-	while True:
-		x=None
-		while len(wq_cache):
-			#print('[wq_put]wq_cache len:',len(wq_cache))
-			try:
-				x=wq_cache.pop()
-			except:
-				continue
-			if not wq.full() and x != None:
-				try:
-					wq.put(x)
-				except:
-					wq_cache.append(x)
-			elif wq.full() and x != None:
-				wq_cache.append(x)
-				wq_get()
-				return
-
-		if weqget:
-			try:
-				x=next(wg)
-			except:
-				if not wcq.empty() and wq.empty():
-					try:
-						y=wcq.get()
-					except:
-						wq_get()
-						return
-					we.clear()
-					print('[wq_put]return to wfunc()',threading.current_thread().name,'wcq empty',wcq.empty(),'we set',we.is_set(),'weqget =',weqget)
-					wfunc()
-					return
-				#print('[wq_put]return to wq_get()',threading.current_thread().name,'wcq empty',wcq.empty(),'we set',we.is_set(),'weqget =',weqget)
-				wq_get()
-				return
-			#print('[wq_put]',threading.current_thread().name,'wq full:',wq.full(),'|x=',x)
-			if not wq.full() and x != None:
-				try:
-					wq.put_nowait(x)
-				except:
-					wq_cache.append(x)
-			elif wq.full() and x != None:
-				wq_cache.append(x)
-				wq_get()
-				return
-		elif not weqget and not wq.empty():
-			#print('[wq_put]',threading.current_thread().name,'return to wfunc 2 ','wcq empty :',wcq.empty(),'| eq empty :',eq.empty(),'weqget =',weqget,'we set',we.is_set())
-			wq_get()
-			return
-		elif not weqget and wq.empty():
-			wfunc()
-			return
-
-def wq_get():
-	global ptime,pcount,resbf,weqget,errlist
-	while not wq.empty():
-		x=None
-		std=''
-		text=''
-		try:
-			x=wq.get_nowait()
-		except:
-			if wcq.empty():
-				break
-			else:
-				time.sleep(0.1)
-				continue
-		print('[wq_get]',threading.current_thread().name,'x =',x)
-		r=random.randint(2,6)
-		for i in range(r):
-			text+='a'
-			time.sleep(1)
-		std=str(x)+'\t'+text+'\n'
-		#print('[wfunc]',threading.current_thread().name,'std :',std)
-		res_cache.append(std)
-		wq.task_done()
-		ptime+=r
-		pcount+=1
-		if pcount%(wths) < wths/100:
-			res_save()
-	we.wait()
-	wq_put()
-	return
-
-def wfunc():
-	global resbf,weqget,errlist,wcq
-	if wcq.empty():
-		try:
-			wcq.put_nowait(threading.current_thread().name)
-		except:
-			wq_get()
-			return
-		we.clear()
-		#print(threading.current_thread().name,'wcq.queue.index:',wcq.queue.index(threading.current_thread().name),'wcq empty',wcq.empty())
-		if wcq.queue.index(threading.current_thread().name) == 0:
-			print('[wfunc]return to eq_get()',threading.current_thread().name,'wcq empty',wcq.empty(),'we set',we.is_set(),'weqget =',weqget)
+	global wg
+	x=None
+	try:
+		x=next(wg)
+	except:
+		if not wg_ready:
 			eq_get()
-			return
-		else:
-			print('[wfunc]return to wq_get()',threading.current_thread().name,'wcq empty',wcq.empty(),'we set',we.is_set(),'weqget =',weqget)
-			wq_get()
-			return
-	elif not weqget and not wcq.empty():
-		if ee.is_set():
-			ee.clear()
-		elif not we.is_set():
-			we.set()
-		while len(res_cache):
-			res_save()
-		while len(errlist):
-			v=''
-			try:
-				v+=res_cache.pop()
-			except:
-				continue
-			reslog.write(v)
-		return
-	#print('[wfunc]',threading.current_thread().name,'return to wq_put wcq empty:',wcq.empty(),'| wq empty :',wq.empty(),'weqget =',weqget,'we set',we.is_set())
-	we.wait()
-	wq_get()
-	return
+	if x != None:
+		wq.put(x)
 
-def res_save():
+async def work():
+	global pcount,workers,task,count
+	while True:
+		std = ''
+		text = ''
+		x = None
+		if not wq.empty():
+			x = wq.get()
+			pcount+=1
+		elif weqget and wq.empty():
+			wq_put()
+		if x != None:
+			await slow_work(std,text,x)
+			if count%(workers) < workers/100:
+				await res_save()
+		elif x == None and not weqget:
+			while len(res_cache):
+				await res_save()
+			return
+
+async def slow_work(std,text,x):
+	global count,res_cache,ptime,pcount,fname
+	r = random.randint(2,6)
+	ptime+=r
+	for i in range(r):
+		text+='a'
+		await asyncio.sleep(1)
+	std=str(x)+'\t'+text+'\n'
+	#print('[slow_work]x = %s,r = %s,std = %s' % (x,r,std))
+	res_cache.append(std)
+	count+=1
+	if count%500 == 0:
+		pgbar.bar(task,count,50,st)
+	elif count == task:
+		pgbar.bar(task,count,50,st)
+		print('\n\n[work]work queue is empty,write to %s'%fname)
+	#sys.stdout.write('\rcount = '+str(count)+'\t|cw = '+str(cw))
+
+async def res_save():
 	global wths,res_cache
 	v=''
 	for i in range(wths):
@@ -348,6 +252,33 @@ def pwfunc():
 		reslog.flush()
 	return os.getpid()
 
+def cb_w_p_fin(test):
+	global p_fin_c,procs
+	p_fin_c.append(test)
+	print('[cb_w_p_fin]',p_fin_c)
+	if len(p_fin_c) == procs:
+		pw.terminate()
+	return
+
+def prepare(workers):
+	print('[prepare]pid-%s prepare %d workers...'%(os.getpid(),workers))
+	count=0
+	coros=[]
+	workers_g=workers_y(workers)
+	while True:
+		try:
+			x = next(workers_g)
+		except:
+			break
+		coros.append(x)
+		count+=1
+		if count%100 == 0:
+			pgbar.bar(workers,count,50,st)
+		elif count==workers:
+			pgbar.bar(workers,count,50,st)
+	print('\n[prepare]pid-%s workers is ready'%os.getpid())
+	return coros
+
 def delcache():
 	cachedir='__pycache__'
 	try:
@@ -364,14 +295,6 @@ def delcache():
 			return
 	return
 
-def cb_w_p_fin(test):
-	global p_fin_c,procs
-	p_fin_c.append(test)
-	print('[cb_w_p_fin]',p_fin_c)
-	if len(p_fin_c) == procs:
-		pw.terminate()
-	return
-	
 if __name__=='__main__':
 	tracemalloc.start()
 	st=time.time()
@@ -380,9 +303,8 @@ if __name__=='__main__':
 	procs=int(input('set procs:'))-1
 	if procs <= 1:
 		procs=1
-	wths=int(input('set thread count:'))
-	task=int(input('set task count:'))
-	workers=int(input('set workers :'))
+	workers=int(input('set workers:'))
+	task=int(input('set task:'))
 	wqs=workers
 	bartask=task
 	#procs=os.cpu_count()
@@ -408,7 +330,7 @@ if __name__=='__main__':
 	reslog=open(fname,'a')
 
 #set var to work procs
-	wq=queue.Queue(int(wths*procs))
+	wq=queue.Queue(int(workers*procs))
 	wcq=queue.Queue(1)
 	we=threading.Event()
 	weqget=True
@@ -420,20 +342,22 @@ if __name__=='__main__':
 	errlist=[]
 	p_fin_c=[]
 	
-	print('\n[main]works is running....')
+	coros = prepare(workers)
+	
+	print('\n[main]task is running....')
 	loop = asyncio.get_event_loop()
 	fs=asyncio.gather(*coros)
 	loop.run_until_complete(fs)
-	loop.close()
 	
 	pw=Pool(procs)
 	for _ in range(procs):
-		pw.apply_async(pwfunc,callback=cb_w_p_fin)
+		pw.apply_async(pwfunc,(coros,),callback=cb_w_p_fin)
 	#del wq,wg,ptime,pcount,wq_cache,res_cache,errlist
 	pw.close()
 	pw.join()
 	print('pw is over......')
 	pe.join()
+	loop.close()
 	reslog.close()
 	
 	print('\nprocs : %s\tthread : %s\tqueue maxsize : %s' % (procs,wths,wq.maxsize))
