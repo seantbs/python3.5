@@ -84,44 +84,14 @@ def eq_get():
 	wqe=[]
 	wqa=None
 	wqb=None
-
-	if weqget:
-		ee.set()
-		while eq.empty():
-			if not weqget:
-				wq_put()
-				return
-			elif eq.empty() and taskend.value == True:
-				weqget=False
-				break
-	else:
-		wq_put()
-		return
-
 	if not eq.empty() and weqget:
-		while True:
-			if weqget:
-				try:
-					wqe=eq.get_nowait()
-				except:
-					print('[eq_get]',threading.current_thread().name,'wqe get failed|eq empty :',eq.empty(),'| wcq empty :',wcq.empty(),'|weqget:',weqget,'ee set:',ee.is_set())
-					if not weqget:
-						wq_get()
-						return
-					else:
-						ee.set()
-						#time.sleep(0.1)
-						continue
-			break
+		wqe=eq.get_nowait()
 		eq.task_done()
-		print('<%.4f s>' % (time.time()-st),'| [eq_get]',threading.current_thread().name,'wqe=',wqe,'| eq empty :',eq.empty(),'| we set',we.is_set(),'| ee set:',ee.is_set(),'| wcq empty :',wcq.empty(),)
 		if wqe != 'done' and wqe != []:
 			wqa=wqe.pop()
 			wqb=wqe.pop()
 			wg=wq_put_y(wqa,wqb)
 			ee.set()
-			wq_put()
-			return
 		elif wqe == 'done':
 			weqget=False
 
