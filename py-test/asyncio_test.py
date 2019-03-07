@@ -20,7 +20,7 @@ def got_result(future):
 
 #test loop
 async def work():
-	global cw,workers,works,count,dot
+	global cw,workers,works,count
 	while True:
 		std = ''
 		text = ''
@@ -28,10 +28,6 @@ async def work():
 		if not wq.empty():
 			x = wq.get()
 			cw+=1
-			if count < workers:
-				if cw%3000 == 0:
-					sys.stdout.write('\r'+dot)
-					dot+='.'
 		if x != None:
 			await slow_work(std,text,x)
 			if count%(workers) < workers/100:
@@ -81,7 +77,7 @@ def wq_put_y(a):
 def workers_y(a):
 	for i in range(a):
 		yield work()
-		
+
 def prepare(workers,counts):
 	print('[prepare]prepare %d workers...'%workers)
 	count=0
@@ -131,9 +127,8 @@ if __name__=='__main__':
 	ct=0
 	cw=0
 	count=0
-	dot=''
 	res_cache=[]
-	workers=5000
+	workers=6000
 	works=65536
 	wq=queue.Queue()
 	coros = prepare(workers,works)
