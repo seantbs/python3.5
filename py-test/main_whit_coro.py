@@ -126,7 +126,7 @@ def eq_get():
 			weqget=False
 
 def wq_put():
-	global wg
+	global wg,wg_ready
 	x=None
 	try:
 		x=next(wg)
@@ -325,6 +325,7 @@ if __name__=='__main__':
 	we=threading.Event()
 	weqget=True
 	wg=None
+	wg_ready=False
 	ptime=0
 	pcount=0
 	wq_cache=[]
