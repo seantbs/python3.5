@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 
 from multiprocessing import Event,JoinableQueue,Pool,Process,Value
-import io,os,sys,time,random,threading,queue
+import io,os,sys,time,random,threading,queue,asyncio
 import pgbar,tracemalloc
 
 def eq_put_y(a,b,c):
@@ -134,7 +134,7 @@ async def slow_work(std,text,x):
 		text+='a'
 		await asyncio.sleep(1)
 	std=str(x)+'\t'+text+'\n'
-	#print('[slow_work]x = %s,r = %s,std = %s' % (x,r,std))
+	print('[slow_work]pid-%s x = %s,r = %s,std = %s' % (os.getpid(),x,r,std))
 	res_cache.append(std)
 	count+=1
 	if count%500 == 0:
@@ -196,6 +196,7 @@ def pefunc():
 def pwfunc():
 	global allcount,alltime
 	print('[pwfunc]pid =',os.getpid(),'is running...')
+	coros = prepare(workers)
 	loop = asyncio.get_event_loop()
 	fs=asyncio.gather(*coros)
 	loop.run_until_complete(fs)
@@ -273,7 +274,7 @@ if __name__=='__main__':
 	alltime=Value('i',0)
 	allcount=Value('i',0)
 	bar=Value('i',1)
-	
+
 #set var to event procs
 	ee=Event()
 	pe=Process(target=pefunc)
@@ -291,8 +292,6 @@ if __name__=='__main__':
 
 #set var to work procs
 	wq=queue.Queue(int(workers*procs))
-	wcq=queue.Queue(1)
-	we=threading.Event()
 	weqget=True
 	wg=None
 	wg_ready=False
@@ -303,12 +302,9 @@ if __name__=='__main__':
 	errlist=[]
 	p_fin_c=[]
 	
-	coros = prepare(workers)
-	
 	pw=Pool(procs)
 	for _ in range(procs):
-		pw.apply_async(pwfunc,(coros,),callback=cb_w_p_fin)
-	#del wq,wg,ptime,pcount,wq_cache,res_cache,errlist
+		pw.apply_async(pwfunc,callback=cb_w_p_fin)
 	pw.close()
 	pw.join()
 	print('pw is over......')
