@@ -88,13 +88,11 @@ def eq_get():
 	if weqget:
 		ee.set()
 		while eq.empty():
-			print('[eq_get]',threading.current_thread().name,'wcq empty :',wcq.empty(),'weqget is',weqget,'| ee set:',ee.is_set(),'| we set',we.is_set(),'| eq qsize:',eq.qsize())
 			if not weqget:
 				wq_put()
 				return
 			elif eq.empty() and taskend.value == True:
 				weqget=False
-				we.set()
 				break
 	else:
 		wq_put()
@@ -219,18 +217,6 @@ def c_e_th():
 	#wbar.join()
 	return
 
-def c_w_th(ths):
-	thp=[]
-	for i in range(ths):
-		t=threading.Thread(target=wfunc,name='tid'+str(os.getpid())+r'/'+str(i))
-		thp.append(t)
-	for a in thp:
-		a.start()
-	for b in thp:
-		b.join()
-	print('\n[c_w_th]',os.getpid(),'wq unfinished tasks :',wq.unfinished_tasks)
-	return
-
 def pefunc():
 	print(os.getpid(),'pefunc is starting......')
 	c_e_th()
@@ -240,7 +226,11 @@ def pefunc():
 def pwfunc():
 	global allcount,alltime
 	print('[pwfunc]pid =',os.getpid(),'is running...')
-	c_w_th(wths)
+	loop = asyncio.get_event_loop()
+	fs=asyncio.gather(*coros)
+	loop.run_until_complete(fs)
+	loop.close()
+	
 	allcount.value+=pcount
 	alltime.value+=ptime
 	print('tracemalloc:',tracemalloc.get_traced_memory())
@@ -344,11 +334,6 @@ if __name__=='__main__':
 	
 	coros = prepare(workers)
 	
-	print('\n[main]task is running....')
-	loop = asyncio.get_event_loop()
-	fs=asyncio.gather(*coros)
-	loop.run_until_complete(fs)
-	
 	pw=Pool(procs)
 	for _ in range(procs):
 		pw.apply_async(pwfunc,(coros,),callback=cb_w_p_fin)
@@ -357,7 +342,6 @@ if __name__=='__main__':
 	pw.join()
 	print('pw is over......')
 	pe.join()
-	loop.close()
 	reslog.close()
 	
 	print('\nprocs : %s\tthread : %s\tqueue maxsize : %s' % (procs,wths,wq.maxsize))
