@@ -373,9 +373,7 @@ if __name__=='__main__':
 	st=time.time()
 	delcache()
 #public var set
-	procs=int(input('set procs:'))-1
-	if procs <= 1:
-		procs=1
+	procs=int(input('set procs:'))
 	wths=int(input('set thread count:'))
 	task=int(input('set task count:'))
 	wqs=wths
