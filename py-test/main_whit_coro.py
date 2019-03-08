@@ -81,7 +81,7 @@ def progress():
 	while True:
 		time.sleep(0.1)
 		pgbar.bar(bartask,allcount.value,50,st)
-		if allcount.value == bartask:
+		if allcount.value >= bartask:
 			break
 
 async def eq_get():
