@@ -64,90 +64,88 @@ def efunc():
 			n+=1
 			if n <= procs:
 				eq.put('done')
-				print('[efunc]n =',n,'eq empty',eq.empty(),'ee set:',ee.is_set())
+				#print('[efunc]n =',n,'eq empty',eq.empty(),'ee set:',ee.is_set())
 				if procs == 1:
 					ee.clear()
 					taskend.value=True
-					print('[efunc]',threading.current_thread().name,'<1> ee set:',ee.is_set())
 					return
 			elif n > procs and eq.empty():
 				ee.clear()
 				taskend.value=True
-				print('[efunc]',threading.current_thread().name,'<1> ee set:',ee.is_set())
 				return
 		ee.clear()
 		ee.wait()
 	return
 
-def eq_get():
-	global wq,wqs,wg,procs,weqget,task
+async def eq_get():
+	global wqs,wg,wg_ready,weqget
 	wqe=[]
 	wqa=None
 	wqb=None
 	if not eq.empty() and weqget:
-		wqe=eq.get_nowait()
+		wqe=eq.get()
 		eq.task_done()
+		#print('[eq_get]pid-%s wqe=%s'%(os.getpid(),wqe))
 		if wqe != 'done' and wqe != []:
 			wqa=wqe.pop()
 			wqb=wqe.pop()
 			wg=wq_put_y(wqa,wqb)
+			wg_ready=True
 			ee.set()
 		elif wqe == 'done':
 			weqget=False
+			ee.set()
+		#print('[eq_get]pid-%s [%s,%s] | eq empty:%s | weqget=%s'%(os.getpid(),wqa,wqb,eq.empty(),weqget))
 
-def wq_put():
+async def wq_put():
 	global wg,wg_ready
 	x=None
 	try:
 		x=next(wg)
 	except:
-		if not wg_ready:
-			eq_get()
+		wg_ready=False
+		if not wg_ready and weqget:
+			await eq_get()
 	if x != None:
 		wq.put(x)
 
 async def work():
-	global pcount,workers,task,count
+	global pcount,workers,task,allcount,alltime
 	while True:
 		std = ''
 		text = ''
 		x = None
 		if not wq.empty():
 			x = wq.get()
-			pcount+=1
+			#print('[work]pid-%s x = %s pcount=%s' % (os.getpid(),x,pcount))
 		elif weqget and wq.empty():
-			wq_put()
+			await wq_put()
 		if x != None:
 			await slow_work(std,text,x)
-			if count%(workers) < workers/100:
-				await res_save()
 		elif x == None and not weqget:
 			while len(res_cache):
 				await res_save()
 			return
+		pgbar.bar(task,pcount,50,st)
 
 async def slow_work(std,text,x):
-	global count,res_cache,ptime,pcount,fname
+	global res_cache,ptime,pcount,fname,workers,task
 	r = random.randint(2,6)
 	ptime+=r
 	for i in range(r):
 		text+='a'
 		await asyncio.sleep(1)
 	std=str(x)+'\t'+text+'\n'
-	print('[slow_work]pid-%s x = %s,r = %s,std = %s' % (os.getpid(),x,r,std))
+	#print('[slow_work]pid-%s x = %s,r = %s,std:%s' % (os.getpid(),x,r,std))
 	res_cache.append(std)
-	count+=1
-	if count%500 == 0:
-		pgbar.bar(task,count,50,st)
-	elif count == task:
-		pgbar.bar(task,count,50,st)
-		print('\n\n[work]work queue is empty,write to %s'%fname)
-	#sys.stdout.write('\rcount = '+str(count)+'\t|cw = '+str(cw))
+	pcount+=1
+	if pcount%workers == 0:
+		await res_save()
 
 async def res_save():
-	global wths,res_cache
+	global workers,res_cache
 	v=''
-	for i in range(wths):
+	for i in range(workers):
 		try:
 			v+=res_cache.pop()
 		except:
@@ -159,26 +157,12 @@ async def res_save():
 	reslog.flush()
 	return
 
-def wfunc_bar():
-	global bartask,st
-	while True:
-		count=bar.value
-		if count < bartask:
-			pgbar.bar(bartask,count,50,st)
-		elif count >= bartask:
-			pgbar.bar(bartask,count,50,st)
-			ee.set()
-			break
-		#print('count =',count)
-		time.sleep(0.5)
-	return
-
 def c_e_th():
-	global wths,procs
-	thp=[]
 	pevent=threading.Thread(target=efunc,name='pevent_tid='+str(os.getpid())+'/0')
 	pevent.start()
 	pevent.join()
+	ee.clear()
+	ee.wait()
 	print('\n[c_e_th]there is no more task,efunc done,use time:%.2f' % (time.time()-st)+'s')
 	print('='*60)
 	print('[c_e_th]waiting for resbf thread over...')
@@ -194,14 +178,14 @@ def pefunc():
 	return
 
 def pwfunc():
-	global allcount,alltime
-	print('[pwfunc]pid =',os.getpid(),'is running...')
+	global allcount,alltime,pcount,ptime
+	print('[pwfunc]pid-',os.getpid(),'is running...')
 	coros = prepare(workers)
 	loop = asyncio.get_event_loop()
 	fs=asyncio.gather(*coros)
 	loop.run_until_complete(fs)
 	loop.close()
-	
+	print('\n[work]work queue is empty,write to %s'%fname)
 	allcount.value+=pcount
 	alltime.value+=ptime
 	print('tracemalloc:',tracemalloc.get_traced_memory())
@@ -216,7 +200,7 @@ def pwfunc():
 def cb_w_p_fin(test):
 	global p_fin_c,procs
 	p_fin_c.append(test)
-	print('[cb_w_p_fin]',p_fin_c)
+	#print('[cb_w_p_fin]',p_fin_c)
 	if len(p_fin_c) == procs:
 		pw.terminate()
 	return
@@ -233,11 +217,7 @@ def prepare(workers):
 			break
 		coros.append(x)
 		count+=1
-		if count%100 == 0:
-			pgbar.bar(workers,count,50,st)
-		elif count==workers:
-			pgbar.bar(workers,count,50,st)
-	print('\n[prepare]pid-%s workers is ready'%os.getpid())
+	print('[prepare]pid-%s workers is ready'%os.getpid())
 	return coros
 
 def delcache():
@@ -261,13 +241,10 @@ if __name__=='__main__':
 	st=time.time()
 	delcache()
 #public var set
-	procs=int(input('set procs:'))-1
-	if procs <= 1:
-		procs=1
+	procs=int(input('set procs:'))
 	workers=int(input('set workers:'))
 	task=int(input('set task:'))
 	wqs=workers
-	bartask=task
 	#procs=os.cpu_count()
 	eq=JoinableQueue(procs)
 	taskend=Value('b',False)
@@ -279,7 +256,6 @@ if __name__=='__main__':
 	ee=Event()
 	pe=Process(target=pefunc)
 	pe.start()
-	del bartask
 	
 #log file set
 	fname='./result.log'
@@ -308,9 +284,10 @@ if __name__=='__main__':
 	pw.close()
 	pw.join()
 	print('pw is over......')
+	ee.set()
 	pe.join()
 	reslog.close()
 	
-	print('\nprocs : %s\tthread : %s\tqueue maxsize : %s' % (procs,wths,wq.maxsize))
+	print('\nprocs : %s\tthread : %s\tqueue maxsize : %s' % (procs,workers,wq.maxsize))
 	print('real time: '+str(alltime.value)+'s\tcounts: '+str(allcount.value))
-	print('use time: %.2f' % (time.time()-st)+'s')
+	print('use time: %.4f' % (time.time()-st)+'s')
