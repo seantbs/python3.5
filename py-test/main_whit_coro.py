@@ -38,7 +38,7 @@ def workers_y(a):
 		yield work()
 
 def efunc():
-	global task,wqs,procs,taskend
+	global task,wqs,procs
 	print('[efunc]event tid',threading.current_thread().name,'is starting...')
 	while True:
 		if task != 0:
@@ -67,15 +67,22 @@ def efunc():
 				#print('[efunc]n =',n,'eq empty',eq.empty(),'ee set:',ee.is_set())
 				if procs == 1:
 					ee.clear()
-					taskend.value=True
 					return
 			elif n > procs and eq.empty():
 				ee.clear()
-				taskend.value=True
 				return
 		ee.clear()
 		ee.wait()
 	return
+
+def progress():
+	global bartask
+	print('[progress]workers are working...')
+	while True:
+		time.sleep(0.1)
+		pgbar.bar(bartask,allcount.value,50,st)
+		if allcount.value == bartask:
+			break
 
 async def eq_get():
 	global wqs,wg,wg_ready,weqget
@@ -126,7 +133,6 @@ async def work():
 			while len(res_cache):
 				await res_save()
 			return
-		pgbar.bar(task,pcount,50,st)
 
 async def slow_work(std,text,x):
 	global res_cache,ptime,pcount,fname,workers,task
@@ -139,6 +145,7 @@ async def slow_work(std,text,x):
 	#print('[slow_work]pid-%s x = %s,r = %s,std:%s' % (os.getpid(),x,r,std))
 	res_cache.append(std)
 	pcount+=1
+	allcount.value+=1
 	if pcount%workers == 0:
 		await res_save()
 
@@ -159,10 +166,12 @@ async def res_save():
 
 def c_e_th():
 	pevent=threading.Thread(target=efunc,name='pevent_tid='+str(os.getpid())+'/0')
+	pgbar_th=threading.Thread(target=progress,name='progress_th')
 	pevent.start()
+	pgbar_th.start()
+	pgbar_th.join()
 	pevent.join()
-	ee.clear()
-	ee.wait()
+
 	print('\n[c_e_th]there is no more task,efunc done,use time:%.2f' % (time.time()-st)+'s')
 	print('='*60)
 	print('[c_e_th]waiting for resbf thread over...')
@@ -186,12 +195,13 @@ def pwfunc():
 	loop.run_until_complete(fs)
 	loop.close()
 
-	allcount.value+=pcount
+	#allcount.value+=pcount
 	alltime.value+=ptime
-	print('tracemalloc:',tracemalloc.get_traced_memory())
-	print('\n[pwfunc]pid='+str(os.getpid())+' real time: '+str(ptime)+'s\tcounts:'+str(pcount))
-	print('[pwfunc]'+str(os.getpid())+' wfunc is done use time:%.2f' % (time.time()-st)+'s')
-	print('[pwfunc]wq empty :',wq.empty(),'|wq size :',wq.qsize(),'| errlist count :',len(errlist))
+	ee.clear()
+	ee.wait()
+	print('\ntracemalloc:',tracemalloc.get_traced_memory())
+	print('[pwfunc]pid='+str(os.getpid())+' real time: '+str(ptime)+'s\tcounts:'+str(pcount))
+	print('[pwfunc]pid='+str(os.getpid())+' wfunc is done use time:%.2f' % (time.time()-st)+'s'+'\n[pwfunc]pid='+str(os.getpid())+' wq empty :',wq.empty(),'| errlist count :',len(errlist))
 	while len(errlist):
 		reslog.write('err:\t'+errlist.pop())
 		reslog.flush()
@@ -245,12 +255,12 @@ if __name__=='__main__':
 	workers=int(input('set workers:'))
 	task=int(input('set task:'))
 	wqs=workers
+	bartask=task
 	#procs=os.cpu_count()
 	eq=JoinableQueue(procs)
-	taskend=Value('b',False)
+	
 	alltime=Value('i',0)
 	allcount=Value('i',0)
-	bar=Value('i',1)
 
 #set var to event procs
 	ee=Event()
@@ -282,13 +292,12 @@ if __name__=='__main__':
 	for _ in range(procs):
 		pw.apply_async(pwfunc,callback=cb_w_p_fin)
 	pw.close()
-	pw.join()
-	print('[main]pw is over......')
-	print('[main]all works done,saved to %s'%fname)
-	ee.set()
 	pe.join()
+	ee.set()
+	pw.join()
+	print('\n[main]all works done,saved to %s'%fname)
 	reslog.close()
-	
+	print('\nResult of Execution :')
 	print('\nprocs : %s\tthread : %s\tqueue maxsize : %s' % (procs,workers,wq.maxsize))
 	print('real time: '+str(alltime.value)+'s\tcounts: '+str(allcount.value))
 	print('use time: %.4f' % (time.time()-st)+'s')
