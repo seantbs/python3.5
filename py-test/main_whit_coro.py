@@ -185,7 +185,7 @@ def pwfunc():
 	fs=asyncio.gather(*coros)
 	loop.run_until_complete(fs)
 	loop.close()
-	print('\n[work]work queue is empty,write to %s'%fname)
+
 	allcount.value+=pcount
 	alltime.value+=ptime
 	print('tracemalloc:',tracemalloc.get_traced_memory())
@@ -283,7 +283,8 @@ if __name__=='__main__':
 		pw.apply_async(pwfunc,callback=cb_w_p_fin)
 	pw.close()
 	pw.join()
-	print('pw is over......')
+	print('[main]pw is over......')
+	print('[main]all works done,saved to %s'%fname)
 	ee.set()
 	pe.join()
 	reslog.close()
