@@ -1,7 +1,7 @@
 #!/usr/bin/python
 # -*- coding: utf-8 -*-
 
-from multiprocessing import Event,JoinableQueue,Pool,Process,Value
+from multiprocessing import Event,JoinableQueue,Pool,Process,Value,Queue
 import io,os,sys,time,random,threading,queue,asyncio
 import pgbar,tracemalloc
 
@@ -76,12 +76,16 @@ def efunc():
 	return
 
 def progress():
-	global bartask
-	print('[progress]workers are working...')
+	global bartask,procs
+	print('[progress]workers are running...')
+	ee.wait()
+	for _ in range(procs):
+		print('[progress]worker pid :',state_pid.get())
 	while True:
 		time.sleep(0.1)
-		pgbar.bar(bartask,allcount.value,50,st)
-		if allcount.value >= bartask:
+		pgbar.bar(bartask,progress_count.value,50,st)
+		if bartask == allcount.value:
+			pgbar.bar(bartask,allcount.value,50,st)
 			break
 
 async def eq_get():
@@ -117,7 +121,7 @@ async def wq_put():
 		wq.put(x)
 
 async def work():
-	global pcount,workers,task,allcount,alltime
+	global pcount,workers,task
 	while True:
 		std = ''
 		text = ''
@@ -132,7 +136,8 @@ async def work():
 		elif x == None and not weqget:
 			while len(res_cache):
 				await res_save()
-			return
+			break
+	return
 
 async def slow_work(std,text,x):
 	global res_cache,ptime,pcount,fname,workers,task
@@ -145,7 +150,7 @@ async def slow_work(std,text,x):
 	#print('[slow_work]pid-%s x = %s,r = %s,std:%s' % (os.getpid(),x,r,std))
 	res_cache.append(std)
 	pcount+=1
-	allcount.value+=1
+	progress_count.value+=1
 	if pcount%workers == 0:
 		await res_save()
 
@@ -181,22 +186,22 @@ def c_e_th():
 	return
 
 def pefunc():
-	print(os.getpid(),'pefunc is starting......')
+	print('[pefunc]pid',os.getpid(),'pefunc is starting......')
 	c_e_th()
 	print('[pefunc]pefunc done......')
 	return
 
 def pwfunc():
-	global allcount,alltime,pcount,ptime
-	print('[pwfunc]pid-',os.getpid(),'is running...')
+	global pcount,ptime
+	#print('[pwfunc]pid-',os.getpid(),'is running...')
+	state_pid.put(os.getpid())
 	coros = prepare(workers)
 	loop = asyncio.get_event_loop()
 	fs=asyncio.gather(*coros)
 	loop.run_until_complete(fs)
 	loop.close()
-
-	#allcount.value+=pcount
 	alltime.value+=ptime
+	allcount.value+=pcount
 	ee.clear()
 	ee.wait()
 	print('\ntracemalloc:',tracemalloc.get_traced_memory())
@@ -258,9 +263,10 @@ if __name__=='__main__':
 	bartask=task
 	#procs=os.cpu_count()
 	eq=JoinableQueue(procs)
-	
+	state_pid=Queue()
 	alltime=Value('i',0)
 	allcount=Value('i',0)
+	progress_count=Value('i',0)
 
 #set var to event procs
 	ee=Event()
