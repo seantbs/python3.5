@@ -76,16 +76,16 @@ def efunc():
 	return
 
 def progress():
-	global task,procs
+	global bartask,procs
 	print('[progress]workers are running...')
 	ee.wait()
 	for _ in range(procs):
 		print('[progress]worker pid :',state_pid.get())
 	while True:
 		time.sleep(0.1)
-		pgbar.bar(task,progress_count.value,50,st)
+		pgbar.bar(bartask,progress_count.value,50,st)
 		if task == allcount.value:
-			pgbar.bar(task,allcount.value,50,st)
+			pgbar.bar(bartask,allcount.value,50,st)
 			break
 
 async def eq_get():
@@ -307,20 +307,20 @@ if __name__=='__main__':
 	if ip and port:
 		print("ip range :",ip)
 		ipseed=iprange_g.set_seed(ip)
-		ipcounts=iprange_g.ip_counts(ips)
-		task=ipcounts*(pe-ps)
+		ipcounts=iprange_g.ip_counts(ipseed)
+		bartask=task=ipcounts
 		print("the ip range start ",ips[0]," counts ",counts)
 	elif ip and portlist:
 		print("ip range :",ip)
 		ipseed=iprange_g.set_seed(ip)
-		ipcounts=iprange_g.ip_counts(ips)
-		task=ipcounts*len(sp)
+		ipcounts=iprange_g.ip_counts(ipseed)
+		bartask=task=ipcounts
 	elif host and port:
 		print("ip range :",host)
-		task=len(host)*(pe-ps)
+		bartask=task=len(host)
 	elif host and portlist:
 		print("ip range :",host)
-		task=len(host)*len(sp)
+		bartask=task=len(host)
 	else:
 		print("please set ipaddr/port numbers or range")
 		sys.exit(0)
