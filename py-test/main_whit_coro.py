@@ -21,7 +21,7 @@ def eq_put_y(a,b,c):
 				a-=b
 				yield a
 			elif a*c >= b/c and a < b*c:
-				if a > c:
+				if a >= c:
 					a=a-(int(a/c)+a%c)
 					yield a
 				elif a < c:
@@ -47,11 +47,11 @@ def efunc():
 					break
 				eg=eq_put_y(task,wqs,procs)
 				eql=[]
-				#print('[eq_put]task =',task)
+				print('[eq_put]task =',task)
 				eql.append(task)
 				task=next(eg)
 				eql.append(task)
-				#print('[eq_put]eql :',eql)
+				print('[eq_put]eql :',eql)
 				eq.put(eql)
 		elif task == 0:
 			break
