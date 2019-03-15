@@ -277,7 +277,6 @@ if __name__=='__main__':
 	parser.add_argument("-v", "--version",action='version', version='%(prog)s 1.0')
 	parser.add_argument('-host',type=str,nargs='*',default='127.0.0.1',help="set host list like '192.168.0.1 192.168.0.2' default 127.0.0.1")
 	parser.add_argument('-range',type=str,help="set ip range to scan like '192.168.0.1-192.168.1.1' just once")
-	parser.add_argument("-v", "--version",action='version', version='%(prog)s 1.0')
 	parser.add_argument('-ps',type=int,nargs='?',default=1,help='set start port vaule')
 	parser.add_argument('-pe',type=int,nargs='?',default=1024,help='set end port vaule')
 	parser.add_argument('-sp',type=int,nargs='+',help="set specify port vaule like '80 135 137'")
