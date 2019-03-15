@@ -37,29 +37,76 @@ def set_seed(ipls):
 	#split ip
 	ipa=ipls[:4]
 	ipb=ipls[4:]
-
 	#set weight
 	w=[8,4,2,1]
 	w_ipa=0
 	w_ipb=0
-
-	g=[]
+	x=[]
 	for i in range(4):
 		if ipa[i] < ipb[i]:
-			w_ipa,w_ipb=w_ipa+w[i],w_ipb+0
-			g.append(ipb[i]-ipa[i])
+			w_ipb,w_ipa=w_ipb+w[i],w_ipa
+			x.append(ipb[i]-ipa[i])
+			break
 		elif ipa[i] > ipb[i]:
-			w_ipb,w_ipa=w_ipb+w[i],w_ipa+0
-			g.append(ipa[i]-ipb[i])
+			w_ipa,w_ipb=w_ipa+w[i],w_ipb
+			x.append(ipa[i]-ipb[i])
+			break
 		elif ipa[i] == ipb[i]:
 			w_ipa,w_ipb=w_ipa+w[i],w_ipb+w[i]
-			g.append(0)
+			x.append(0)
+	z=len(x)
+	#print('[set_seed]z = %s,w_ipa=%s,w_ipb=%s'%(z,w_ipa,w_ipb))
 	if w_ipa > w_ipb:
-		return ipa,g
-	elif w_ipa == w_ipb:
-		return ipa,g
+		for i in range(4-z):
+			e=ipa[i+z]-ipb[i+z]
+			#print('[set_seed]e =',e)
+			if e > 0:
+				w_ipa,w_ipb=w_ipa+w[i+z],w_ipb
+				x.append(e)
+			elif e < 0:
+				w_ipb,w_ipa=w_ipb+w[i+z],w_ipa
+				x.append(e)
+			elif e == 0:
+				w_ipa,w_ipb=w_ipa+w[i+z],w_ipb+w[i+z]
+				x.append(0)
 	elif w_ipa < w_ipb:
-		return ipb,g
+		for i in range(4-z):
+			e=ipb[i+z]-ipa[i+z]
+			#print('[set_seed]z = %s,w_ipa=%s,w_ipb=%s'%(z,w_ipa,w_ipb))
+			if e > 0:
+				w_ipb,w_ipa=w_ipb+w[i+z],w_ipa
+				x.append(e)
+			elif e < 0:
+				w_ipa,w_ipb=w_ipa+w[i+z],w_ipb
+				x.append(e)
+			elif e == 0:
+				w_ipb,w_ipa=w_ipb+w[i+z],w_ipa+w[i+z]
+				x.append(0)
+	
+	if w_ipa > w_ipb:
+		return ipb,x
+	elif w_ipa <= w_ipb:
+		return ipa,x
+
+def set_end(seed,count):
+	r=''
+	a,b,c,d=seed[0][0],seed[0][1],seed[0][2],seed[0][3]
+	count+=d
+	if count >= 256:
+		d=count%256
+		c+=int((count-d)/256)
+		if c >= 256:
+			x=c%256
+			b+=int((c-x)/256)
+			c=x
+			if b >= 256:
+				x=b%256
+				a+=int((b-x)/256)
+				b=x
+	for i in a,b,c,d:
+		r+=str(i)+'.'
+	r=r.rstrip('.')
+	return r
 
 #ip generate
 def ip_iter(seed,count):
@@ -123,8 +170,10 @@ if __name__=='__main__':
 		counts=ip_counts(ips)
 		print("the ip range start ",ips[0]," counts ",counts)
 		ipg=ip_iter(ips,counts)
-		for i in range(counts):
-			print(next(ipg))
+		ipend=set_end(ips,counts)
+		print('ipend :',ipend)
+		#for i in range(counts):
+		#	print(next(ipg))
 	elif host:
 		print("host ip inclue:",host)
 	else:
