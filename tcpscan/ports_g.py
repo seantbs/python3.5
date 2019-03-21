@@ -32,7 +32,7 @@ def check_p(*args):
 		sys.exit(0)
 
 #port range generate
-def prange(s,e):
+def port_range(s,e):
 	if s > e:
 		print("warn:-ps value must less than -pe value.please check -pe default value.")
 		sys.exit(0)
@@ -42,9 +42,9 @@ def prange(s,e):
 		s=s+1
 
 #specify port func
-def plist(a):
-	for i in a:
-		print("scan sp port:",i)
+def port_list(sp):
+	for i in sp:
+		yield i
 
 if __name__=='__main__':
 	parser=argparse.ArgumentParser(description='input port range with int.default scan ports 1-1024.')
@@ -64,9 +64,11 @@ if __name__=='__main__':
 
 	#test pg
 	if check_p(sp):
-		plist(sp)
+		g=port_list(sp)
+		for i in g:
+			print('port list:',i)
 	elif check_p(ps,pe):
-		scan=prange(ps,pe)
+		scan=port_range(ps,pe)
 		for i in scan:
 			print("scan port range:",i)
 	else:
