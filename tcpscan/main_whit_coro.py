@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 
 from multiprocessing import Event,JoinableQueue,Pool,Process,Value,Queue
-import io,os,sys,time,random,threading,queue,asyncio
+import io,os,sys,time,random,threading,queue,asyncio,socket
 import pgbar,tracemalloc,ports_g,iprange_g
 
 def eq_put_y(a,b,c):
