@@ -143,6 +143,10 @@ def ip_iter(seed,count):
 					print("out of ip range")
 					break
 
+def ip_host(host):
+	for i in host:
+		yield i
+
 #the counts that how many ips need to scan
 def ip_counts(ips):
 	counts=0        
@@ -175,6 +179,9 @@ if __name__=='__main__':
 		#for i in range(counts):
 		#	print(next(ipg))
 	elif host:
-		print("host ip inclue:",host)
+		print("host ip inclue:")
+		g=ip_host(host)
+		for i in g:
+			print('host:',i)
 	else:
 		sys.exit(0)
