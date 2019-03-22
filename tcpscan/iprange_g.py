@@ -103,6 +103,8 @@ def set_end(seed,count):
 				x=b%256
 				a+=int((b-x)/256)
 				b=x
+	else:
+		d=count
 	for i in a,b,c,d:
 		r+=str(i)+'.'
 	r=r.rstrip('.')
@@ -144,8 +146,11 @@ def ip_iter(seed,count):
 					break
 
 def ip_host(host):
-	for i in host:
-		yield i
+	if type(host) == str:
+		yield host
+	else:
+		for i in host:
+			yield i
 
 #the counts that how many ips need to scan
 def ip_counts(ips):
@@ -170,7 +175,7 @@ if __name__=='__main__':
 	if ip:
 		print("ip range :",ip)
 		ips=set_seed(ip)
-		print('ips =',ips)
+		print('ips =',ips,type(ips))
 		counts=ip_counts(ips)
 		print("the ip range start ",ips[0]," counts ",counts)
 		ipg=ip_iter(ips,counts)
