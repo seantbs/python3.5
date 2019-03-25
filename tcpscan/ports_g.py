@@ -64,6 +64,7 @@ if __name__=='__main__':
 
 	#test pg
 	if check_p(sp):
+		print('sp :',type(sp))
 		g=port_list(sp)
 		for i in g:
 			print('port list:',i)
