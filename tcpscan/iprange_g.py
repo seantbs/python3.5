@@ -90,7 +90,8 @@ def set_seed(ipls):
 
 def set_end(seed,count):
 	r=''
-	a,b,c,d=seed[0][0],seed[0][1],seed[0][2],seed[0][3]
+	rlist=[]
+	a,b,c,d=seed[0],seed[1],seed[2],seed[3]
 	count+=d
 	if count >= 256:
 		d=count%256
@@ -105,45 +106,50 @@ def set_end(seed,count):
 				b=x
 	else:
 		d=count
-	for i in a,b,c,d:
+	'''for i in a,b,c,d:
 		r+=str(i)+'.'
 	r=r.rstrip('.')
-	return r
+	print('[set_end]ip end:',r)'''
+	for i in a,b,c,d:
+		rlist.append(i)
+	return rlist
 
 #ip generate
 def ip_iter(seed,count):
 	#print(seed,count)
-	a,b,c,d=seed[0][0],seed[0][1],seed[0][2],seed[0][3]
+	a,b,c,d=seed[0],seed[1],seed[2],seed[3]-1
 	print("ip seed:",a,b,c,d)
 	print("iter count:",count)	
 	r=""
-	while count > -1:
-		while d < 256:
-			for i in a,b,c,d:
-				r+=str(i)+'.'
-				#print(r)
-			r=r.rstrip('.')
-			#print(r,"count:",count)
-			yield r
-			r=""
+	while count > 0:
+		r=""
+		count-=1
+		if d <= 255:
 			d+=1
-			count-=1
-		d=0
-		if c < 256:
-			c+=1
-			continue
-		else:
-			c=0
-			if b < 256:
-				b+=1
+			if d > 255:
+				d=0
+				if c <= 255:
+					c+=1
+					if c > 255:
+						c=0
+						if b <= 255:
+							b+=1
+							if b > 255:
+								b=0
+								if a <= 255:
+									a+=1
+								else:
+									print("out of ip range")
+									break
+								continue
+						continue
 				continue
-			else:
-				b=0
-				if a < 256:
-					a+=1
-				else:
-					print("out of ip range")
-					break
+		for i in a,b,c,d:
+			r+=str(i)+'.'
+			#print(r)
+		r=r.rstrip('.')
+		#print(r,"count:",count)
+		yield r
 
 def ip_host(host):
 	for i in host:
@@ -175,11 +181,11 @@ if __name__=='__main__':
 		print('ips =',ips,type(ips))
 		counts=ip_counts(ips)
 		print("the ip range start ",ips[0]," counts ",counts)
-		ipg=ip_iter(ips,counts)
-		ipend=set_end(ips,counts)
+		ipend=set_end(ips[0],counts)
+		ipg=ip_iter(ips[0],counts)
 		print('ipend :',ipend)
-		#for i in range(counts):
-		#	print(next(ipg))
+		for i in ipg:
+			print(i)
 	elif host:
 		print('host :',type(host))
 		print("host ip inclue:")
