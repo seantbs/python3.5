@@ -39,6 +39,7 @@ def eq_put_iprange(task,wqs,procs,ipseed,wqport):
 				eql=[]
 				print('[eq_put_iprange]task =',task)
 				a=task;task=next(eg);c=a-task
+				print('[eq_put_iprange]ipseed:',ipseed)
 				eql.append(ipseed)
 				ipseed=iprange_g.set_end(ipseed,c)
 				eql.append(c)
@@ -101,7 +102,7 @@ def efunc():
 			except:
 				break
 			task=alltask
-			eq_put_iprange(task,wqs,procs,ipseed_type,wqport)
+			eq_put_iprange(task,wqs,procs,ipseed_type[0],wqport)
 	elif type(ipseed_type) == list:
 		while True:
 			try:
@@ -130,7 +131,7 @@ def efunc():
 	return
 
 def progress():
-	global alltask,procs,ports
+	global alltask,procs,ports,st
 	bartask=alltask*ports
 	print('[progress]workers are running...')
 	ee.wait()
@@ -139,6 +140,7 @@ def progress():
 	while True:
 		time.sleep(1)
 		pgbar.bar(bartask,progress_count.value,50,st)
+		print('[progress]progress_count=',progress_count.value,'allcount=',allcount.value)
 		if bartask == allcount.value:
 			pgbar.bar(bartask,allcount.value,50,st)
 			break
@@ -182,16 +184,15 @@ def wq_put():
 		x=next(ip_g)
 		print('[wq_put]pid',os.getpid(),'x=',x)
 	except:
-		print('[wq_put]pid',os.getpid(),'x=',x)
+		print('[wq_put]pid',os.getpid(),'x=None,ip_g is stop')
 		wg_ready=False
 		if not wg_ready and weqget:
 			eq_get()
-			wq_put()
 		else:
 			return
 	if x != None:
 		x=(x,wqport)
-		print('[wq_put]x=',x)
+		#print('[wq_put]x=',x)
 		wq.put(x)
 		return
 
@@ -214,7 +215,7 @@ async def work(loop):
 			if con == None:
 				opencount+=1
 				print('pid',os.getpid(),addr,'open')
-				std='%s\t%s\t%s\topen'%(addr[0],addr[1])
+				std='%s,%s,open\n\r'%(addr[0],addr[1])
 				res_cache.append(std)
 			s.close()
 			ptime+=time.time()-st
@@ -277,7 +278,7 @@ def pefunc():
 	return
 
 def pwfunc():
-	global pcount,ptime
+	global opencount,closecount,ptime
 	#print('[pwfunc]pid-',os.getpid(),'is running...')
 	state_pid.put(os.getpid())
 	res_save_thread=threading.Thread(target=res_thread,name='res_thread_tid='+str(os.getpid()))
@@ -291,9 +292,10 @@ def pwfunc():
 	loop.run_until_complete(fs)
 	loop.close()
 	alltime.value+=ptime
-	allcount.value+=pcount
+	allcount.value+=opencount+closecount
 	
 	res_save_thread.join()
+	ee.clear()
 	ee.wait()
 	
 	print('\ntracemalloc:',tracemalloc.get_traced_memory())
@@ -380,19 +382,20 @@ def check_input():
 		print("ip range :",ip)
 		ipseed=iprange_g.set_seed(ip)
 		ipcounts=iprange_g.ip_counts(ipseed)
-		print("the ip range start ",ips[0]," counts ",counts)
-		return ipcounts,pe-ps,1,1,workers,procs,ps,pe,sp,host,ipr
+		print("the ip range start ",ipseed[0]," counts ",ipcounts)
+		return ipcounts,pe-ps,1,1,workers,procs,ps,pe,sp,host,ip
 	elif ip and portlist:
 		print("ip range :",ip)
 		ipseed=iprange_g.set_seed(ip)
 		ipcounts=iprange_g.ip_counts(ipseed)
-		return ipcounts,len(sp),1,0,workers,procs,ps,pe,sp,host,ipr
+		print("the ip range start ",ipseed[0]," counts ",ipcounts)
+		return ipcounts,len(sp),1,0,workers,procs,ps,pe,sp,host,ip
 	elif host and port:
 		print("ip range :",host)
-		return len(host),pe-ps,0,1,workers,procs,ps,pe,sp,host,ipr
+		return len(host),pe-ps,0,1,workers,procs,ps,pe,sp,host,ip
 	elif host and portlist:
 		print("ip range :",host)
-		return len(host),len(sp),0,0,workers,procs,ps,pe,sp,host,ipr
+		return len(host),len(sp),0,0,workers,procs,ps,pe,sp,host,ip
 	else:
 		print("please set ipaddr/port numbers or range")
 		sys.exit(0)
