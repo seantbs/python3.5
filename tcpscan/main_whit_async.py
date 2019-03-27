@@ -133,7 +133,7 @@ def efunc():
 def progress():
 	global alltask,procs,ports,st
 	bartask=alltask*ports
-	print('[progress]workers are running...')
+	print('[progress]workers are running...bartask:',bartask)
 	ee.wait()
 	for _ in range(procs):
 		print('[progress]worker pid :',state_pid.get())
@@ -383,7 +383,7 @@ def check_input():
 		ipseed=iprange_g.set_seed(ip)
 		ipcounts=iprange_g.ip_counts(ipseed)
 		print("the ip range start ",ipseed[0]," counts ",ipcounts)
-		return ipcounts,pe-ps,1,1,workers,procs,ps,pe,sp,host,ip
+		return ipcounts,pe-ps+1,1,1,workers,procs,ps,pe,sp,host,ip
 	elif ip and portlist:
 		print("ip range :",ip)
 		ipseed=iprange_g.set_seed(ip)
@@ -392,7 +392,7 @@ def check_input():
 		return ipcounts,len(sp),1,0,workers,procs,ps,pe,sp,host,ip
 	elif host and port:
 		print("ip range :",host)
-		return len(host),pe-ps,0,1,workers,procs,ps,pe,sp,host,ip
+		return len(host),pe-ps+1,0,1,workers,procs,ps,pe,sp,host,ip
 	elif host and portlist:
 		print("ip range :",host)
 		return len(host),len(sp),0,0,workers,procs,ps,pe,sp,host,ip
