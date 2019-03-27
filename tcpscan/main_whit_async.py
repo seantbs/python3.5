@@ -144,6 +144,26 @@ def progress():
 		if bartask == allcount.value:
 			pgbar.bar(bartask,allcount.value,50,st)
 			break
+			
+def c_e_th():
+	pevent=threading.Thread(target=efunc,name='pevent_tid='+str(os.getpid())+'/0')
+	#pgbar_th=threading.Thread(target=progress,name='progress_th')
+	pevent.start()
+	#pgbar_th.start()
+	#pgbar_th.join()
+	pevent.join()
+
+	print('\n[c_e_th]there is no more task,efunc done,use time:%.2f' % (time.time()-st)+'s')
+	print('='*60)
+	print('[c_e_th]waiting for resbf thread over...')
+	return
+
+def pefunc():
+	print('[pefunc]pid',os.getpid(),'pefunc is starting......')
+	c_e_th()
+	print('[pefunc]pefunc done......')
+	return
+
 ###################################################################################
 def eq_get():
 	global wg,wg_ready,weqget,wqport,ip_g
@@ -197,7 +217,7 @@ def wq_put():
 		return
 
 async def work(loop):
-	global opencount,closecount,ptime
+	global opencount,closecount,ptime,st
 	while True:
 		addr=None
 		con=''
@@ -211,7 +231,9 @@ async def work(loop):
 			except OSError as err:
 				closecount+=1
 				err=str(err)
-				print('pid',os.getpid(),addr,err[12:31])
+				std=std='%s,%s,%s\n\r'%(addr[0],addr[1],err)
+				res_cache.append(std)
+				#print('pid',os.getpid(),addr,err[12:31])
 			if con == None:
 				opencount+=1
 				print('pid',os.getpid(),addr,'open')
@@ -223,7 +245,6 @@ async def work(loop):
 		elif weqget and wq.empty():
 			wq_put()
 		elif addr == None and not weqget:
-			print('[work]wq done')
 			break
 	return
 
@@ -255,28 +276,6 @@ def res_save():
 	reslog.flush()
 	return
 
-def c_e_th():
-	pevent=threading.Thread(target=efunc,name='pevent_tid='+str(os.getpid())+'/0')
-	pgbar_th=threading.Thread(target=progress,name='progress_th')
-	pevent.start()
-	pgbar_th.start()
-	pgbar_th.join()
-	pevent.join()
-
-	print('\n[c_e_th]there is no more task,efunc done,use time:%.2f' % (time.time()-st)+'s')
-	print('='*60)
-	print('[c_e_th]waiting for resbf thread over...')
-	#wbar=threading.Thread(target=wfunc_bar,name='wbar_tid='+str(os.getpid()))
-	#wbar.start()
-	#wbar.join()
-	return
-
-def pefunc():
-	print('[pefunc]pid',os.getpid(),'pefunc is starting......')
-	c_e_th()
-	print('[pefunc]pefunc done......')
-	return
-
 def pwfunc():
 	global opencount,closecount,ptime
 	#print('[pwfunc]pid-',os.getpid(),'is running...')
@@ -291,16 +290,19 @@ def pwfunc():
 	fs=asyncio.gather(*corus)
 	loop.run_until_complete(fs)
 	loop.close()
+	print('[pwfunc]ptime:',ptime)
 	alltime.value+=ptime
+	print('[pwfunc]alltime:',alltime.value)
+	print('[pwfunc]allcount:',allcount.value)
 	allcount.value+=opencount+closecount
 	
 	res_save_thread.join()
 	ee.clear()
 	ee.wait()
 	
-	print('\ntracemalloc:',tracemalloc.get_traced_memory())
+	#print('\ntracemalloc:',tracemalloc.get_traced_memory())
 	print('[pwfunc]pid='+str(os.getpid())+' real time: '+str(ptime)+'s\topen_counts:'+str(opencount)+'\tclose_counts:'+str(closecount))
-	print('[pwfunc]pid='+str(os.getpid())+' wfunc is done use time:%.2f' % (time.time()-st)+'s'+'\n[pwfunc]pid='+str(os.getpid())+' wq empty :',wq.empty(),'| errlist count :',len(errlist))
+	print('[pwfunc]pid='+str(os.getpid())+' wfunc is done use time:%.4f' % (time.time()-st)+'s'+'\n[pwfunc]pid='+str(os.getpid())+' wq empty :',wq.empty(),'| errlist count :',len(errlist))
 	while len(errlist):
 		reslog.write('err:\t'+errlist.pop())
 		reslog.flush()
@@ -331,7 +333,7 @@ def prepare(workers,loop):
 		count+=1
 	print('[prepare]pid-%s workers is ready'%os.getpid())
 	return corus
-
+###################################################################
 def delcache():
 	cachedir='__pycache__'
 	try:
@@ -455,6 +457,6 @@ if __name__=='__main__':
 	print('\n[main]all works done,saved to %s'%fname)
 	reslog.close()
 	print('\nResult of Execution :')
-	print('\nprocs : %s\tthread : %s\tqueue maxsize : %s' % (procs,workers,wq.maxsize))
-	print('real time: '+str(alltime.value)+'s\tcounts: '+str(allcount.value))
+	print('\nprocs : %s\tcorus : %s\tqueue maxsize : %s' % (procs,workers,wq.maxsize))
+	print('real time: %.4f'%ptime,'open_counts:',opencount,'close_count:',closecount,'all counts',opencount+closecount)
 	print('use time: %.4f' % (time.time()-st)+'s')
