@@ -281,7 +281,7 @@ async def work(loop):
 			except OSError as err:
 				closecount+=1
 				err=str(err)
-				std=std='%s,%s,%s\n'%(addr[0],addr[1],err)
+				std='%s,%s,%s\n'%(addr[0],addr[1],err)
 				res_cache.append(std)
 				#print('[work]pid',os.getpid(),addr,err)
 			if con == None:
@@ -298,18 +298,17 @@ async def work(loop):
 			break
 	return
 
-def res_thread():
-	global opencount,workers,res_cache,weqget
+def res_thread(workers,res_cache,weqget):
 	print('[res_thread]res_thread tid',threading.current_thread().name,'is starting...')
 	while True:
-		if opencount%workers < workers/100:
+		if weqget:
 			res_save(workers,res_cache)
 		elif not weqget:
 			while len(res_cache):
 				res_save(workers,res_cache)
 			print('[res_thread]res_cache:',len(res_cache))
 			break
-		time.sleep(0.1)
+		time.sleep(1)
 	return
 
 def res_save(workers,res_cache):
@@ -330,7 +329,7 @@ def pwfunc():
 	global alltime,allcount
 	#print('[pwfunc]pid-',os.getpid(),'is running...')
 	state_pid.put(os.getpid())
-	res_save_thread=threading.Thread(target=res_thread,name='res_thread_tid='+str(os.getpid()))
+	res_save_thread=threading.Thread(target=res_thread,args=(workers,res_cache,weqget),name='res_thread_tid='+str(os.getpid()))
 	res_save_thread.start()
 	selloop=asyncio.SelectorEventLoop()
 	asyncio.set_event_loop(selloop)
@@ -358,7 +357,7 @@ def cb_w_p_fin(test):
 	p_fin_c.append(test)
 	#print('[cb_w_p_fin]',p_fin_c)
 	if len(p_fin_c) == procs:
-		pwfunc.terminate()
+		p_wfunc.terminate()
 	return
 
 def workers_y(a,loop):
