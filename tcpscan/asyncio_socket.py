@@ -7,6 +7,7 @@ async def work(host,loop):
 	while not wq.empty():
 		addr=wq.get()
 		con=''
+		st=time.time()
 		s=socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 		s.setblocking(0)
 		#print('[work]host:',i,s)
@@ -21,6 +22,7 @@ async def work(host,loop):
 			print(addr,'open')
 		s.close()
 		ptime+=time.time()-st
+		#print('[work]ptime=',ptime)
 
 def workers_y(a,host,loop):
 	for i in range(a):
@@ -47,13 +49,13 @@ if __name__=='__main__':
 	
 	wq=queue.Queue()
 	host=[]
-	for i in range(65536):
+	for i in range(1,65536):
 		x='10.186.64.3'
 		y=i
 		z=(x,y)
 		wq.put(z)
 	
-	workers=6000
+	workers=900
 	selloop=asyncio.SelectorEventLoop()
 	asyncio.set_event_loop(selloop)
 	loop = asyncio.get_event_loop()
