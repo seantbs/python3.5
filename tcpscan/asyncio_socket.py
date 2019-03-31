@@ -43,6 +43,7 @@ def prepare(workers,host,loop):
 
 if __name__=='__main__':
 	st=time.time()
+	x=str(input('scan ip:'))
 	ptime=0
 	opencount=0
 	closecount=0
@@ -50,9 +51,7 @@ if __name__=='__main__':
 	wq=queue.Queue()
 	host=[]
 	for i in range(1,65536):
-		x='10.186.64.3'
-		y=i
-		z=(x,y)
+		z=(x,i)
 		wq.put(z)
 	
 	workers=900
