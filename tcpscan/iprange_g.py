@@ -152,8 +152,12 @@ def ip_iter(seed,count):
 		yield r
 
 def ip_host(host):
-	for i in host:
-		yield i
+	if type(host) == str:
+		yield host
+		return
+	else:
+		for i in host:
+			yield i
 
 #the counts that how many ips need to scan
 def ip_counts(ips):
