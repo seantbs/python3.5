@@ -60,7 +60,6 @@ def eq_put_iprange_fast(task,ipseed,port_g):
 			except:
 				break
 			while True:
-				ips-=1
 				eql=[]
 				if ips != 0:
 					#print('[eq_put_iprange_fast]ipseed:',ipseed)
@@ -70,7 +69,8 @@ def eq_put_iprange_fast(task,ipseed,port_g):
 					eql.append(wqport)
 					print('[eq_put_iprange_fast]eql :',eql)
 					eq.put(eql)
-				if ips == 0:
+					ips-=1
+				elif ips == 0:
 					break
 		else:
 			ee.clear()
@@ -139,7 +139,7 @@ def efunc():
 	print('[efunc]port_g:',port_g,'|ipseed_type:',type(ipseed_type))
 	if type(ipseed_type) == tuple:
 		if alltask < procs:
-			eq_put_iprange_fast(task,ipseed_type[0],port_g)
+			eq_put_iprange_fast(alltask,ipseed_type[0],port_g)
 		else:
 			while True:
 				try:
@@ -160,7 +160,7 @@ def efunc():
 				except:
 					break
 				task=alltask
-				eq_put_iplist(task,ports,wqs,procs,ipseed_type,wqport)
+				eq_put_iplist(task,wqs,procs,ipseed_type,wqport)
 	#print('[efunc]task =',task,'et set',et.is_set(),'| ee set',ee.is_set())
 	n=0
 	while True:
@@ -244,6 +244,11 @@ def eq_get():
 			ee.set()
 			return
 		#print('[eq_get]pid-%s [%s,%s] | eq empty:%s | weqget=%s'%(os.getpid(),wqa,wqb,eq.empty(),weqget))
+	elif eq.empty() and weqget:
+		ee.set()
+		eq_get()
+	elif eq.empty() and not weqget:
+		return
 
 def wq_put():
 	global wg_ready,wqport,ip_g,weqget
@@ -294,19 +299,20 @@ async def work(loop):
 		elif weqget and wq.empty():
 			wq_put()
 		elif addr == None and not weqget:
-			print('[work]pid',os.getpid(),'progress_count.value',progress_count.value)
+			#print('[work]pid',os.getpid(),'progress_count.value',progress_count.value)
 			break
 	return
 
-def res_thread(workers,res_cache,weqget):
+def res_thread(workers,res_cache):
+	global weqget,work_done
 	print('[res_thread]res_thread tid',threading.current_thread().name,'is starting...')
 	while True:
-		if weqget:
+		#print('[res_thread]pid',os.getpid(),'weqget:',weqget)
+		if not work_done:
 			res_save(workers,res_cache)
-		elif not weqget:
+		elif work_done:
 			while len(res_cache):
 				res_save(workers,res_cache)
-			print('[res_thread]res_cache:',len(res_cache))
 			break
 		time.sleep(1)
 	return
@@ -326,10 +332,10 @@ def res_save(workers,res_cache):
 	return
 
 def pwfunc():
-	global alltime,allcount
+	global alltime,allcount,work_done
 	#print('[pwfunc]pid-',os.getpid(),'is running...')
 	state_pid.put(os.getpid())
-	res_save_thread=threading.Thread(target=res_thread,args=(workers,res_cache,weqget),name='res_thread_tid='+str(os.getpid()))
+	res_save_thread=threading.Thread(target=res_thread,args=(workers,res_cache),name='res_thread_tid='+str(os.getpid()))
 	res_save_thread.start()
 	selloop=asyncio.SelectorEventLoop()
 	asyncio.set_event_loop(selloop)
@@ -337,24 +343,26 @@ def pwfunc():
 	corus = prepare(workers,loop)
 	fs=asyncio.gather(*corus)
 	loop.run_until_complete(fs)
-	res_save_thread.join()
 	loop.close()
+	work_done=True
+	res_save_thread.join()
 	alltime.value+=ptime
-	allcount.value+=opencount+closecount
-	print('[pwfunc]pid',os.getpid(),'ee set:',ee.is_set(),'allcount.value:',allcount.value,weqget)
-	
-	print('\ntracemalloc:',tracemalloc.get_traced_memory())
+	#print('[pwfunc]pid',os.getpid(),'ee set:',ee.is_set())
+	ee.wait()
+	#print('\ntracemalloc:',tracemalloc.get_traced_memory())
 	print('[pwfunc]pid=%s\treal time:%.4fs\topen_counts:%s\tclose_counts:%s' % (os.getpid(),ptime,opencount,closecount))
-	print('[pwfunc]wfunc is done use time:%.4fs'%(time.time()-st)+'\twq empty:'+str(wq.empty())+'\tres_err count:'+str(len(errlist)))
+	print('[pwfunc]pid=%s\tuse time:%.4fs'%(os.getpid(),time.time()-st)+'\twq empty:'+str(wq.empty())+'\tres_err count:'+str(len(errlist)))
 	
 	while len(errlist):
 		reslog.write('err:\t'+errlist.pop())
 		reslog.flush()
-	return os.getpid()
+	return os.getpid(),opencount,closecount
 
-def cb_w_p_fin(test):
-	global p_fin_c,procs
-	p_fin_c.append(test)
+def cb_w_p_fin(result):
+	global p_fin_c,procs,opencount,closecount
+	opencount+=result[1]
+	closecount+=result[2]
+	p_fin_c.append(result[0])
 	#print('[cb_w_p_fin]',p_fin_c)
 	if len(p_fin_c) == procs:
 		p_wfunc.terminate()
@@ -375,7 +383,7 @@ def prepare(workers,loop):
 			break
 		corus.append(x)
 		count+=1
-	print('[prepare]pid-%s workers is ready'%os.getpid())
+	#print('[prepare]pid-%s workers is ready'%os.getpid())
 	return corus
 ############################################################################
 def delcache():
@@ -449,7 +457,7 @@ def check_input():
 if __name__=='__main__':
 	alltask,ports,check_ip,check_port,workers,procs,ps,pe,sp,host,ipr=check_input()
 	print('[mian]alltask:%s ports:%s check_ip:%s check_port:%s'%(alltask,ports,check_ip,check_port))
-	tracemalloc.start()
+	#tracemalloc.start()
 	st=time.time()
 	delcache()
 
@@ -459,7 +467,7 @@ if __name__=='__main__':
 	eq=JoinableQueue(procs)
 	state_pid=Queue()
 	alltime=Value('d',0.0)
-	allcount=Value('i',0)
+	#allcount=Value('i',0)
 	progress_count=Value('i',0)
 	
 #log file set
@@ -478,6 +486,7 @@ if __name__=='__main__':
 	ip_g=None
 	wqport=None
 	wg_ready=False
+	work_done=False
 	ptime=0
 	opencount=0
 	closecount=0
@@ -502,5 +511,5 @@ if __name__=='__main__':
 	reslog.close()
 	print('\nResult of Execution :')
 	print('\nprocs : %s\tcorus : %s\tqueue maxsize : %s' % (procs,workers,wq.maxsize))
-	print('real time: %.4f'%alltime.value,'open_counts:',opencount,'close_count:',closecount,'all counts',opencount+closecount)
+	print('real time:%.4fs\topened:%s\tclosed:%s\tall:%s'%(alltime.value,opencount,closecount,opencount+closecount))
 	print('use time: %.4f' % (time.time()-st)+'s')
