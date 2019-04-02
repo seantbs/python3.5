@@ -62,6 +62,7 @@ def eq_put_iprange_fast(task,ipseed,port_g):
 			while True:
 				eql=[]
 				if ips != 0:
+					ips-=1
 					#print('[eq_put_iprange_fast]ipseed:',ipseed)
 					eql.append(ipseed)
 					ipseed=iprange_g.set_end(ipseed,1)
@@ -69,7 +70,6 @@ def eq_put_iprange_fast(task,ipseed,port_g):
 					eql.append(wqport)
 					print('[eq_put_iprange_fast]eql :',eql)
 					eq.put(eql)
-					ips-=1
 				elif ips == 0:
 					break
 		else:
@@ -274,7 +274,7 @@ async def work(loop):
 	while True:
 		addr=None
 		con=''
-		st=time.time()
+		wst=time.time()
 		if not wq.empty():
 			addr = wq.get()
 			#print('[work]pid',os.getpid(),'get addr:',addr)
@@ -295,7 +295,7 @@ async def work(loop):
 				std='%s,%s,open\n'%(addr[0],addr[1])
 				res_cache.append(std)
 			s.close()
-			ptime+=time.time()-st
+			ptime+=time.time()-wst
 		elif weqget and wq.empty():
 			wq_put()
 		elif addr == None and not weqget:
@@ -348,7 +348,6 @@ def pwfunc():
 	res_save_thread.join()
 	alltime.value+=ptime
 	#print('[pwfunc]pid',os.getpid(),'ee set:',ee.is_set())
-	ee.wait()
 	#print('\ntracemalloc:',tracemalloc.get_traced_memory())
 	print('[pwfunc]pid=%s\treal time:%.4fs\topen_counts:%s\tclose_counts:%s' % (os.getpid(),ptime,opencount,closecount))
 	print('[pwfunc]pid=%s\tuse time:%.4fs'%(os.getpid(),time.time()-st)+'\twq empty:'+str(wq.empty())+'\tres_err count:'+str(len(errlist)))
@@ -410,7 +409,7 @@ def check_input():
 	parser.add_argument('-ps',type=int,nargs='?',default=1,help='set start port vaule')
 	parser.add_argument('-pe',type=int,nargs='?',default=1024,help='set end port vaule')
 	parser.add_argument('-sp',type=int,nargs='+',help="set specify port vaule like '80 135 137'")
-	parser.add_argument('-procs',type=int,nargs='?',default=1,help='set multiprocessing to running')
+	parser.add_argument('-procs',type=int,nargs='?',default=os.cpu_count(),help='set multiprocessing to running')
 	parser.add_argument('-workers',type=int,nargs='?',default=1,help='set workers to running')
 	parser.parse_args()
 	args=parser.parse_args()
@@ -429,31 +428,34 @@ def check_input():
 		print('please set right workers number here and not greater than %s.'%(65536/(os.cpu_count()*16)))
 		sys.exit()
 
-	ip=iprange_g.ip_check(ipr)
+	ip=iprange_g.check_iprange(ipr)
+	host=iprange_g.check_host(host)
 	port=ports_g.check_p(ps,pe)
 	portlist=ports_g.check_p(sp)
-	if ip and port:
-		print("ip range :",ip)
-		ipseed=iprange_g.set_seed(ip)
-		ipcounts=iprange_g.ip_counts(ipseed)
-		print("the ip range start ",ipseed[0]," counts ",ipcounts)
-		return ipcounts,pe-ps+1,1,1,workers,procs,ps,pe,sp,host,ip
-	elif ip and portlist:
+	
+	if ip and portlist:
 		print("ip range :",ip)
 		ipseed=iprange_g.set_seed(ip)
 		ipcounts=iprange_g.ip_counts(ipseed)
 		print("the ip range start ",ipseed[0]," counts ",ipcounts)
 		return ipcounts,len(sp),1,0,workers,procs,ps,pe,sp,host,ip
-	elif host and port:
-		print("ip range :",host)
-		return len(host),pe-ps+1,0,1,workers,procs,ps,pe,sp,host,ip
 	elif host and portlist:
 		print("ip range :",host)
 		return len(host),len(sp),0,0,workers,procs,ps,pe,sp,host,ip
+	elif ip and port:
+		print("ip range :",ip)
+		ipseed=iprange_g.set_seed(ip)
+		ipcounts=iprange_g.ip_counts(ipseed)
+		print("the ip range start ",ipseed[0]," counts ",ipcounts)
+		return ipcounts,pe-ps+1,1,1,workers,procs,ps,pe,sp,host,ip
+	elif host and port:
+		print("ip range :",host)
+		return len(host),pe-ps+1,0,1,workers,procs,ps,pe,sp,host,ip
 	else:
 		print("please set ipaddr/port numbers or range")
 		sys.exit(0)
 
+############################################################################################
 if __name__=='__main__':
 	alltask,ports,check_ip,check_port,workers,procs,ps,pe,sp,host,ipr=check_input()
 	print('[mian]alltask:%s ports:%s check_ip:%s check_port:%s'%(alltask,ports,check_ip,check_port))
@@ -505,7 +507,6 @@ if __name__=='__main__':
 		p_wfunc.apply_async(pwfunc,callback=cb_w_p_fin)
 	p_wfunc.close()
 	p_efunc.join()
-	ee.set()
 	p_wfunc.join()
 	print('\n[main]all works done,saved to %s'%fname)
 	reslog.close()
