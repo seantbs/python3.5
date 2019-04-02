@@ -1,36 +1,61 @@
 #!/usr/bin/pytheon3
 
-import sys,os,time,argparse
+import sys,os,time,argparse,socket
 
-#check ip range input
-def ip_check(r):
+def check_ip(ip):
 	a=[]
 	rs=[]
-	if r:
-		try:
-			if len(r.split(r'-'))==2:
-				sr=r.split(r'-')
-				for i in sr:
-					if len(i.split(r'.'))==4:
-						a=i.split(r'.')
-						for i in a:
-							if int(i) < 0 or int(i) > 255:
-								print("the ip range value include 0-255 int")
-								sys.exit(0)
-							else:
-								rs.append(int(i))
-					else:
-						print("the ip range must be ipv4")
-						sys.exit(0)
-			else:
-				print("The ip range input join with '-' and just only once")
+	if len(ip.split(r'.'))==4:
+		a=ip.split(r'.')
+		for i in a:
+			if int(i) < 0 or int(i) > 255:
+				print("the ip range value include 0-255 int")
 				sys.exit(0)
-			return rs
+			else:
+				rs.append(int(i))
+	else:
+		print("the ip range must be ipv4")
+		sys.exit(0)
+	return rs
+
+def check_host(host):
+	rs=[]
+	if host != None:
+		if type(host) == str:
+			ns=socket.getaddrinfo(host,80)
+			host_ip=ns[0][4][0]
+			check_ip(host_ip)
+			rs.append(host_ip)
+		else:
+			for i in host:
+				ns=socket.getaddrinfo(i,80)
+				host_ip=ns[0][4][0]
+				check_ip(host_ip)
+				rs.append(host_ip)
+		return rs
+	else:
+		return 0
+
+#check ip range input
+def check_iprange(r):
+	rs=[]
+	if r != None:
+		try:
+			sr=r.split(r'-')
 		except:
 			print("The ip range input type must be int(0-255) and join with '-'")
 			sys.exit(0)
+		if len(sr)==2:
+			print(sr)
+			for i in sr:
+				rs.extend(check_ip(i))
+		else:
+			print("The ip range input join with '-' and just only once")
+			sys.exit(0)
+		return rs
+
 	else:
-		return
+		return 0
 
 #set start ip of the range
 def set_seed(ipls):
@@ -178,7 +203,8 @@ if __name__=='__main__':
 	ipr=args.range
 
 	#ipr="192.168.0.0-192.168.2.0"
-	ip=ip_check(ipr)
+	ip=check_iprange(ipr)
+	host=check_host(host)
 	if ip:
 		print("ip range :",ip)
 		ips=set_seed(ip)
