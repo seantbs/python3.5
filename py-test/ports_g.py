@@ -2,34 +2,33 @@
 
 import sys,os,time,argparse
 
-#check port must be 0-65535
-def check_p(*args):
+def check_value(args):
 	id=0
 	err=[]
-
 	for i in args:
+		id+=1
 		if type(i) == int:
 			if i > -1 and i < 65536:
-				i=i
+				continue
 			else:
-				err.append(str(i)+" -> check_id:"+str(id))
-		elif type(i) == list:
-			if i[0]!=None:
-				print(i[0]!=None)
-				for e in i:
-					print(e)
-					if e > -1 and e < 65536:
-						i=i
-					else:	
-						err.append(str(e)+" -> check_id:"+str(id))
+				err.append('value:'+str(i)+' -> list_id:'+str(id))
+				print('port setting error',err)
+				sys.exit(0)
 		else:
-			return 0
-		id+=1
-	if len(err) == 0:
+			err.append(str(i)+" -> check_id:"+str(id))
+			print('port setting error',err)
+			sys.exit(0)
+
+#check port must be 0-65535
+def check_p(*args):
+	#print(type(args[0]))
+	if type(args[0]) == int:
+		check_value(args)
 		return 1
-	elif len(err) != 0:
-		print(err,"are not Correct port numbers or range be Detected, will use default setting")
-		sys.exit(0)
+	elif type(args[0]) == list:
+		check_value(args[0])
+		return 1
+	return 0
 
 #port range generate
 def port_range(s,e):
@@ -73,5 +72,5 @@ if __name__=='__main__':
 		for i in scan:
 			print("scan port range:",i)
 	else:
-		print("please input port numbers or range")
+		print("port setting error!please check the input...")
 		sys.exit(0)
