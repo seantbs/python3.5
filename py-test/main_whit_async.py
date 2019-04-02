@@ -54,6 +54,7 @@ def eq_put_iprange(task,wqs,procs,ipseed,wqport):
 def eq_put_iprange_fast(task,ipseed,port_g):
 	while True:
 		ips=task
+		ipseed_tmp=ipseed
 		if not eq.full():
 			try:
 				wqport=next(port_g)
@@ -62,14 +63,14 @@ def eq_put_iprange_fast(task,ipseed,port_g):
 			while True:
 				eql=[]
 				if ips != 0:
+					ips-=1
 					#print('[eq_put_iprange_fast]ipseed:',ipseed)
-					eql.append(ipseed)
-					ipseed=iprange_g.set_end(ipseed,1)
+					eql.append(ipseed_tmp)
+					ipseed_tmp=iprange_g.set_end(ipseed_tmp,1)
 					eql.append(1)
 					eql.append(wqport)
 					print('[eq_put_iprange_fast]eql :',eql)
 					eq.put(eql)
-					ips-=1
 				elif ips == 0:
 					break
 		else:
@@ -173,7 +174,6 @@ def efunc():
 					ee.clear()
 					return
 			elif n > procs and eq.empty():
-				ee.clear()
 				return
 		ee.clear()
 		ee.wait()
@@ -348,7 +348,6 @@ def pwfunc():
 	res_save_thread.join()
 	alltime.value+=ptime
 	#print('[pwfunc]pid',os.getpid(),'ee set:',ee.is_set())
-	ee.wait()
 	#print('\ntracemalloc:',tracemalloc.get_traced_memory())
 	print('[pwfunc]pid=%s\treal time:%.4fs\topen_counts:%s\tclose_counts:%s' % (os.getpid(),ptime,opencount,closecount))
 	print('[pwfunc]pid=%s\tuse time:%.4fs'%(os.getpid(),time.time()-st)+'\twq empty:'+str(wq.empty())+'\tres_err count:'+str(len(errlist)))
@@ -508,7 +507,6 @@ if __name__=='__main__':
 		p_wfunc.apply_async(pwfunc,callback=cb_w_p_fin)
 	p_wfunc.close()
 	p_efunc.join()
-	ee.set()
 	p_wfunc.join()
 	print('\n[main]all works done,saved to %s'%fname)
 	reslog.close()
