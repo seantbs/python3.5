@@ -54,6 +54,7 @@ def eq_put_iprange(task,wqs,procs,ipseed,wqport):
 def eq_put_iprange_fast(task,ipseed,port_g):
 	while True:
 		ips=task
+		ipseed_tmp=ipseed
 		if not eq.full():
 			try:
 				wqport=next(port_g)
@@ -64,8 +65,8 @@ def eq_put_iprange_fast(task,ipseed,port_g):
 				if ips != 0:
 					ips-=1
 					#print('[eq_put_iprange_fast]ipseed:',ipseed)
-					eql.append(ipseed)
-					ipseed=iprange_g.set_end(ipseed,1)
+					eql.append(ipseed_tmp)
+					ipseed_tmp=iprange_g.set_end(ipseed_tmp,1)
 					eql.append(1)
 					eql.append(wqport)
 					print('[eq_put_iprange_fast]eql :',eql)
@@ -173,7 +174,6 @@ def efunc():
 					ee.clear()
 					return
 			elif n > procs and eq.empty():
-				ee.clear()
 				return
 		ee.clear()
 		ee.wait()
