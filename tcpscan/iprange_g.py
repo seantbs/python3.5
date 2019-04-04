@@ -218,7 +218,7 @@ if __name__=='__main__':
 			print(i)
 	elif host:
 		print('host :',type(host))
-		print("host ip inclue:")
+		print("host ip inclue:",host)
 		g=ip_host(host)
 		for i in g:
 			print('host:',i)
