@@ -94,7 +94,9 @@ def eq_put_fast(task,workers,ipseed,port_g):
 			iplist.append(ip)
 	n=0
 	for p in port_g:
-		if n > workers:
+		n+=1
+		portlist.append(p)
+		if n == workers:
 			while True:
 				if not eq.full():
 					eql=eq_put_fast_set(iplist,portlist)
@@ -105,8 +107,6 @@ def eq_put_fast(task,workers,ipseed,port_g):
 				else:
 					ee.clear()
 					ee.wait()
-		n+=1
-		portlist.append(p)
 	while True:
 		if not eq.full() and len(portlist) != 0:
 			eql=eq_put_fast_set(iplist,portlist)
@@ -120,18 +120,16 @@ def eq_put_fast(task,workers,ipseed,port_g):
 def get_ip_g(check_ip,host,ipr):
 	if check_ip > 0:
 		ipseed=iprange_g.set_seed(ipr)
-		return ipseed
 	elif check_ip == 0:
 		ipseed=host
-		return ipseed
+	return ipseed
 
 def get_port_g(check_port,ps,pe,sp):
 	if check_port > 0:
 		port_g=ports_g.port_range(ps,pe)
-		return port_g
 	elif check_port == 0:
 		port_g=ports_g.port_list(sp)
-		return port_g
+	return port_g
 
 def efunc():
 	global alltask,workers,procs,chekc_ip,check_port,ps,pe,sp,host,ipr
@@ -368,6 +366,7 @@ def pwfunc():
 	res_save_thread.start()
 	
 	we=asyncio.Event()
+	we.set()
 	selloop=asyncio.SelectorEventLoop()
 	asyncio.set_event_loop(selloop)
 	loop = asyncio.get_event_loop()
@@ -398,9 +397,9 @@ def cb_w_p_fin(result):
 		p_wfunc.terminate()
 	return
 
-def workers_y(a,loop):
+def workers_y(a,loop,we):
 	for i in range(a):
-		yield work(loop)
+		yield work(loop,we)
 
 def prepare(workers,loop,we):
 	count=0
@@ -413,7 +412,7 @@ def prepare(workers,loop,we):
 			break
 		corus.append(x)
 		count+=1
-	#print('[prepare]pid-%s workers is ready'%os.getpid())
+	print('[prepare]pid-%s workers is ready'%os.getpid())
 	return corus
 ############################################################################
 def delcache():
