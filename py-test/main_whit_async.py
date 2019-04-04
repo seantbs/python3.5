@@ -5,37 +5,37 @@ from multiprocessing import Event,JoinableQueue,Pool,Process,Value,Queue
 import io,os,sys,time,threading,queue,asyncio,socket,argparse
 import pgbar,tracemalloc,ports_g,iprange_g
 
-def eq_put_y(a,b,c):
-	if a == 0:
+def eq_put_y(task,workers,procs):
+	if task == 0:
 		yield 0
-	if c == 1:
-		for i in range(c):
-			if a >= b:
-				a-=b
-				yield a
+	if procs == 1:
+		for i in range(procs):
+			if task >= workers:
+				task-=workers
+				yield task
 			else:
 				yield 0
-	elif c > 1:
-		for i in range(c):
-			if a >= b*c:
-				a-=b
-				yield a
-			elif a*c >= b/c and a < b*c:
-				if a > c:
-					a=a-(int(a/c)+a%c)
-					yield a
-				elif a < c:
+	elif procs > 1:
+		for i in range(procs):
+			if task >= workers*procs:
+				task-=workers
+				yield task
+			elif task*procs >= workers/procs and task < workers*procs:
+				if task > procs:
+					task=task-(int(task/procs)+task%procs)
+					yield task
+				elif task < procs:
 					yield 0
-			elif a*c < b/c:
+			elif task*procs < workers/procs:
 					yield 0
 
-def eq_put_iprange(task,wqs,procs,ipseed,wqport):
+def eq_put_iprange(task,workers,procs,ipseed,wqport):
 	while True:
 		if task != 0:
 			while not eq.full():
 				if task == 0:
 					break
-				eg=eq_put_y(task,wqs,procs)
+				eg=eq_put_y(task,workers,procs)
 				eql=[]
 				#print('[eq_put_iprange]task =',task)
 				a=task;task=next(eg);c=a-task
@@ -51,39 +51,13 @@ def eq_put_iprange(task,wqs,procs,ipseed,wqport):
 		ee.clear()
 		ee.wait()
 
-def eq_put_iprange_fast(task,ipseed,port_g):
-	while True:
-		ips=task
-		ipseed_tmp=ipseed
-		if not eq.full():
-			try:
-				wqport=next(port_g)
-			except:
-				break
-			while True:
-				eql=[]
-				if ips != 0:
-					ips-=1
-					#print('[eq_put_iprange_fast]ipseed:',ipseed)
-					eql.append(ipseed_tmp)
-					ipseed_tmp=iprange_g.set_end(ipseed_tmp,1)
-					eql.append(1)
-					eql.append(wqport)
-					print('[eq_put_iprange_fast]eql :',eql)
-					eq.put(eql)
-				elif ips == 0:
-					break
-		else:
-			ee.clear()
-			ee.wait()
-
-def eq_put_iplist(task,wqs,procs,ipseed,wqport):
+def eq_put_iplist(task,workers,procs,ipseed,wqport):
 	while True:
 		if task != 0:
 			while not eq.full():
 				if task == 0:
 					break
-				eg=eq_put_y(task,wqs,procs)
+				eg=eq_put_y(task,workers,procs)
 				#print('[eq_put_iplist]task =',task)
 				a=task;task=next(eg)
 				for i in range(task,a):
@@ -98,20 +72,47 @@ def eq_put_iplist(task,wqs,procs,ipseed,wqport):
 		ee.clear()
 		ee.wait()
 
-def eq_put_iplist_fast(ipseed,port_g):
+def eq_put_fast(task,workers,ipseed,port_g):
+	portlist=[]
+	iplist=[]
+	
+	def eq_put_fast_set(iplist,portlist):
+		eql=[]
+		eql.append(iplist)
+		eql.append('fast')
+		eql.append(portlist)
+		print('[eq_put_iplist_fast]eql :',eql)
+		return eql
+	
+	ipseed_t=type(ipseed)
+	if ipseed_t == list:
+		for ip in ipseed:
+			iplist.append(ip)
+	elif ipseed_t == tuple:
+		ipg=iprange_g.ip_iter(ipseed[0],task)
+		for ip in ipg:
+			iplist.append(ip)
+	n=0
+	for p in port_g:
+		if n > workers:
+			while True:
+				if not eq.full():
+					eql=eq_put_fast_set(iplist,portlist)
+					eq.put(eql)
+					portlist=[]
+					n=0
+					break
+				else:
+					ee.clear()
+					ee.wait()
+		n+=1
+		portlist.append(p)
 	while True:
-		if not eq.full():
-			try:
-				wqport=next(port_g)
-			except:
-				break
-			for i in ipseed:
-				eql=[]
-				eql.append(i)
-				eql.append('list')
-				eql.append(wqport)
-				print('[eq_put_iplist_fast]eql :',eql)
-				eq.put(eql)
+		if not eq.full() and len(portlist) != 0:
+			eql=eq_put_fast_set(iplist,portlist)
+			eq.put(eql)
+		elif len(portlist) == 0:
+			return
 		else:
 			ee.clear()
 			ee.wait()
@@ -133,15 +134,15 @@ def get_port_g(check_port,ps,pe,sp):
 		return port_g
 
 def efunc():
-	global alltask,wqs,procs,chekc_ip,check_port,ps,pe,sp,host,ipr
+	global alltask,workers,procs,chekc_ip,check_port,ps,pe,sp,host,ipr
 	print('[efunc]event tid',threading.current_thread().name,'is starting...')
 	port_g=get_port_g(check_port,ps,pe,sp)
 	ipseed_type=get_ip_g(check_ip,host,ipr)
 	print('[efunc]port_g:',port_g,'|ipseed_type:',type(ipseed_type))
-	if type(ipseed_type) == tuple:
-		if alltask < procs:
-			eq_put_iprange_fast(alltask,ipseed_type[0],port_g)
-		else:
+	if alltask < procs:
+		eq_put_fast(alltask,workers,ipseed_type,port_g)
+	elif alltask >= procs:
+		if type(ipseed_type) == tuple:
 			while True:
 				try:
 					wqport=next(port_g)
@@ -149,11 +150,8 @@ def efunc():
 				except:
 					break
 				task=alltask
-				eq_put_iprange(task,wqs,procs,ipseed_type[0],wqport)
-	elif type(ipseed_type) == list:
-		if alltask < procs:
-			eq_put_iplist_fast(ipseed_type,port_g)
-		else:
+				eq_put_iprange(task,workers,procs,ipseed_type[0],wqport)
+		elif type(ipseed_type) == list:
 			while True:
 				try:
 					wqport=next(port_g)
@@ -161,7 +159,7 @@ def efunc():
 				except:
 					break
 				task=alltask
-				eq_put_iplist(task,wqs,procs,ipseed_type,wqport)
+				eq_put_iplist(task,workers,procs,ipseed_type,wqport)
 	#print('[efunc]task =',task,'et set',et.is_set(),'| ee set',ee.is_set())
 	n=0
 	while True:
@@ -193,7 +191,7 @@ def progress():
 		if bartask == allcount.value:
 			pgbar.bar(bartask,allcount.value,50,st)
 			break
-			
+
 def c_e_th():
 	pevent=threading.Thread(target=efunc,name='pevent_tid='+str(os.getpid())+'/0')
 	#pgbar_th=threading.Thread(target=progress,name='progress_th')
@@ -212,8 +210,9 @@ def pefunc():
 	return
 
 ###################################################################################
-def eq_get():
-	global wg,wg_ready,weqget,wqport,ip_g
+def eq_get(we):
+	global wg_ready,weqget,wqport,ip_g
+	wg_ready=True
 	wqe=[]
 	wqport=None
 	ip_g=None
@@ -222,27 +221,35 @@ def eq_get():
 		print('[eq_get]pid',os.getpid(),'wqe=',wqe)
 		eq.task_done()
 		#print('[eq_get]pid-%s wqe=%s'%(os.getpid(),wqe))
-		if wqe != 'done' and wqe != [] and wqe[-2] != 'list':
+		tag=wqe[-2]
+		if wqe != 'done' and wqe != [] and tag != 'fast' and tag != 'list':
 			wqport=wqe.pop()
 			ipcounts=wqe.pop()
 			ipseed=wqe.pop()
 			#print('[eq_get]wqe:',wqe)
 			ip_g=iprange_g.ip_iter(ipseed,ipcounts)
-			wg_ready=True
+			wg_ready=False
+			we.set()
 			ee.set()
-			return
-		elif wqe != 'done' and wqe != [] and wqe[-2] == 'list':
+		elif wqe != 'done' and wqe != [] and tag == 'fast':
 			wqe.pop(-2)
 			wqport=wqe.pop()
 			#print('[eq_get]wqe:',wqe)
-			ip_g=(x for x in wqe)
-			wg_ready=True
+			ip_g=(x for x in wqe.pop())
+			wg_ready=False
+			we.set()
 			ee.set()
-			return
+		elif wqe != 'done' and wqe != [] and tag == 'list':
+			wqe.pop(-2)
+			wqport=wqe.pop()
+			#print('[eq_get]wqe:',wqe)
+			ip_g=(x for x in wqe.pop())
+			wg_ready=False
+			we.set()
+			ee.set()
 		elif wqe == 'done':
 			weqget=False
 			ee.set()
-			return
 		#print('[eq_get]pid-%s [%s,%s] | eq empty:%s | weqget=%s'%(os.getpid(),wqa,wqb,eq.empty(),weqget))
 	elif eq.empty() and weqget:
 		ee.set()
@@ -250,26 +257,48 @@ def eq_get():
 	elif eq.empty() and not weqget:
 		return
 
-def wq_put():
+def wq_put(we):
 	global wg_ready,wqport,ip_g,weqget
-	x=None
-	try:
-		x=next(ip_g)
-		#print('[wq_put]pid',os.getpid(),'x=',x)
-	except:
-		#print('[wq_put]pid',os.getpid(),'x=None,ip_g is stop|wg_ready:',wg_ready)
-		wg_ready=False
-		if not wg_ready and weqget:
-			eq_get()
-		elif not weqget:
-			return
-	if x != None:
-		x=(x,wqport)
-		#print('[wq_put]x=',x)
-		wq.put(x)
-		return
+	we.wait()
+	if weqget:
+		if type(wqport) == list:
+			while not wq.full():
+				try:
+					x=next(ip_g)
+				except:
+					we.clear()
+					if wg_ready:
+						pass
+					else:
+						if not wg_ready and weqget:
+							eq_get(we)
+						elif not weqget:
+							return
+				for p in wqport:
+					s=None
+					s=(x,p)
+					#print('[wq_put]x=',x)
+					wq.put(s)
+		else:
+			while not wq.full():
+				try:
+					x=next(ip_g)
+					#print('[wq_put]pid',os.getpid(),'x=',x)
+				except:
+					#print('[wq_put]pid',os.getpid(),'x=None,ip_g is stop|wg_ready:',wg_ready)
+					we.clear()
+					if wg_ready:
+						pass
+					else:
+						if not wg_ready and weqget:
+							eq_get(we)
+						elif not weqget:
+							return
+				x=(x,wqport)
+				#print('[wq_put]x=',x)
+				wq.put(x)
 
-async def work(loop):
+async def work(loop,we):
 	global opencount,closecount,ptime,progress_count
 	while True:
 		addr=None
@@ -297,7 +326,7 @@ async def work(loop):
 			s.close()
 			ptime+=time.time()-wst
 		elif weqget and wq.empty():
-			wq_put()
+			wq_put(we)
 		elif addr == None and not weqget:
 			#print('[work]pid',os.getpid(),'progress_count.value',progress_count.value)
 			break
@@ -337,10 +366,12 @@ def pwfunc():
 	state_pid.put(os.getpid())
 	res_save_thread=threading.Thread(target=res_thread,args=(workers,res_cache),name='res_thread_tid='+str(os.getpid()))
 	res_save_thread.start()
+	
+	we=asyncio.Event()
 	selloop=asyncio.SelectorEventLoop()
 	asyncio.set_event_loop(selloop)
 	loop = asyncio.get_event_loop()
-	corus = prepare(workers,loop)
+	corus = prepare(workers,loop,we)
 	fs=asyncio.gather(*corus)
 	loop.run_until_complete(fs)
 	loop.close()
@@ -371,10 +402,10 @@ def workers_y(a,loop):
 	for i in range(a):
 		yield work(loop)
 
-def prepare(workers,loop):
+def prepare(workers,loop,we):
 	count=0
 	corus=[]
-	workers_g=workers_y(workers,loop)
+	workers_g=workers_y(workers,loop,we)
 	while True:
 		try:
 			x = next(workers_g)
@@ -464,14 +495,12 @@ if __name__=='__main__':
 	delcache()
 
 #public var set
-	#procs=os.cpu_count()
-	wqs=workers
 	eq=JoinableQueue(procs)
 	state_pid=Queue()
 	alltime=Value('d',0.0)
 	#allcount=Value('i',0)
 	progress_count=Value('i',0)
-	
+
 #log file set
 	fname='./result.log'
 	try:
@@ -481,10 +510,14 @@ if __name__=='__main__':
 	os.path.exists(fname)
 	reslog=open(fname,'a')
 
+#start procs
+	ee=Event()
+	p_efunc=Process(target=pefunc)
+	p_efunc.start()
+	
 #set var to work procs
-	wq=queue.Queue(int(wqs*procs))
+	wq=queue.Queue(int(workers*procs))
 	weqget=True
-	wg=None
 	ip_g=None
 	wqport=None
 	wg_ready=False
@@ -496,20 +529,16 @@ if __name__=='__main__':
 	res_cache=[]
 	errlist=[]
 	p_fin_c=[]
-	
-#start procs
-	ee=Event()
-	p_efunc=Process(target=pefunc)
-	p_efunc.start()
-	
 	p_wfunc=Pool(procs)
 	for _ in range(procs):
 		p_wfunc.apply_async(pwfunc,callback=cb_w_p_fin)
 	p_wfunc.close()
+	
 	p_efunc.join()
 	p_wfunc.join()
 	print('\n[main]all works done,saved to %s'%fname)
 	reslog.close()
+	
 	print('\nResult of Execution :')
 	print('\nprocs : %s\tcorus : %s\tqueue maxsize : %s' % (procs,workers,wq.maxsize))
 	print('real time:%.4fs\topened:%s\tclosed:%s\tall:%s'%(alltime.value,opencount,closecount,opencount+closecount))
